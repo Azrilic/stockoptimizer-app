@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: stockoptimizer-backend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: SENDER_EMAIL
+        scope: run
+      - key: SENDER_PASSWORD
+        scope: run
+      - key: ANTONIO_EMAIL
+        value: antonio.zrilic@logiko.hr
