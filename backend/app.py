@@ -18,7 +18,7 @@ EXCEL_FILE = 'data/Stockoptimizer Detektiv.xlsx'
 # Email config
 SENDER_EMAIL = os.getenv('SENDER_EMAIL', 'your_email@gmail.com')
 SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', 'your_app_password')
-ANTONIO_EMAIL = 'antonio.zrilic@logiko.hr'
+ANTONIO_EMAIL = 'antonio.zrilic@gmail.com'
 WEBINAR_LINK = 'https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu'
 
 # Loadaj Excel datoteke
