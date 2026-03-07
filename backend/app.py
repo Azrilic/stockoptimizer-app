@@ -42,7 +42,7 @@ def map_scores_to_strategies(scores_dict, threshold=4):
                     'id': uzrok_id,
                     'naziv': uzrok_info.iloc[0]['Naziv_uzroka'],
                     'razina': uzrok_info.iloc[0]['Razina rješavanja'],
-                    'podrucje': uzrok_info.iloc[0]['Području'],
+                    'podrucje': uzrok_info.iloc[0]['Područje'],
                     'score': score,
                     'strategije': []
                 })
