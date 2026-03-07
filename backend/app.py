@@ -10,7 +10,7 @@ from email.mime.multipart import MIMEMultipart
 import base64
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type"]}})
 
 # Excel datoteka - trebam je u backend/data/
 EXCEL_FILE = 'data/Stockoptimizer Detektiv.xlsx'
