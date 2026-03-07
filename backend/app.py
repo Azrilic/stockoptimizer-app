@@ -16,9 +16,10 @@ CORS(app)
 EXCEL_FILE = 'data/Stockoptimizer Detektiv.xlsx'
 
 # Email config
-SENDER_EMAIL = os.getenv('SENDER_EMAIL', 'your_email@gmail.com')
-SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', 'your_app_password')
+SENDER_EMAIL = os.getenv('SENDER_EMAIL', '')
+SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', '')
 ANTONIO_EMAIL = 'antonio.zrilic@gmail.com'
+EMAIL_ENABLED = bool(SENDER_EMAIL and SENDER_PASSWORD)
 WEBINAR_LINK = 'https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu'
 
 # Loadaj Excel datoteke
@@ -216,17 +217,21 @@ def submit_form():
         if not top_uzroci:
             return jsonify({'error': 'Nema uzroka sa score >= 4'}), 400
 
-        # Build emails
-        user_email_html = build_user_email_html(ime, top_uzroci)
-        admin_email_html = build_admin_email_html(ime, email, tvrtka, top_uzroci)
+        # Build emails if enabled
+        if EMAIL_ENABLED:
+            user_email_html = build_user_email_html(ime, top_uzroci)
+            admin_email_html = build_admin_email_html(ime, email, tvrtka, top_uzroci)
 
-        # Send emails
-        send_email(email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
-        send_email(ANTONIO_EMAIL, f'NOVI LEAD - {ime}', admin_email_html)
+            # Send emails
+            send_email(email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
+            send_email(ANTONIO_EMAIL, f'NOVI LEAD - {ime}', admin_email_html)
+            message = 'Rezultati su poslani na email!'
+        else:
+            message = 'Rezultati su obrađeni (email slanje nije dostupno).'
 
         return jsonify({
             'success': True,
-            'message': 'Rezultati su poslani na email!',
+            'message': message,
             'uzroci': top_uzroci
         }), 200
 
