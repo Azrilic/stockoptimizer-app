@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/stockoptimizer-app/static/css/main.cb143246.css",
+    "main.js": "/stockoptimizer-app/static/js/main.c88a37d6.js",
+    "index.html": "/stockoptimizer-app/index.html",
+    "main.cb143246.css.map": "/stockoptimizer-app/static/css/main.cb143246.css.map",
+    "main.c88a37d6.js.map": "/stockoptimizer-app/static/js/main.c88a37d6.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.cb143246.css",
+    "static/js/main.c88a37d6.js"
+  ]
+}
