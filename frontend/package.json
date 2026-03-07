@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "prebuild": "mkdir -p public && printf '%s' '<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>StockOptimizer Detektiv</title></head><body><div id=\"root\"></div></body></html>' > public/index.html",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
