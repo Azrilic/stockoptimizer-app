@@ -1,7 +1,7 @@
 {
   "version": 2,
   "buildCommand": "cd frontend && npm run build",
-  "installCommand": "npm install",
+  "installCommand": "cd frontend && npm install",
   "outputDirectory": "frontend/build",
   "routes": [
     {
@@ -10,7 +10,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "frontend/build/index.html"
     }
   ]
 }
