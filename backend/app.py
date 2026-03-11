@@ -14,6 +14,19 @@ app = Flask(__name__)
 # Excel datoteka - trebam je u backend/data/
 EXCEL_FILE = 'data/Stockoptimizer Detektiv.xlsx'
 
+# Cache Excel data na startu - sprječavamo učitavanje Excel-a na svakom zahtjevu!
+_UZROCI_DF = None
+_STRATEGIJE_DF = None
+
+def get_excel_data():
+    """Učitaj Excel datoteku samo prvi put, zatim koristi cached verziju"""
+    global _UZROCI_DF, _STRATEGIJE_DF
+    if _UZROCI_DF is None or _STRATEGIJE_DF is None:
+        excel_data = pd.read_excel(EXCEL_FILE, sheet_name=None)
+        _UZROCI_DF = excel_data['Uzroci_master']
+        _STRATEGIJE_DF = excel_data['Strategije_master']
+    return _UZROCI_DF, _STRATEGIJE_DF
+
 # Email config
 SENDER_EMAIL = os.getenv('SENDER_EMAIL', '')
 SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', '')
@@ -30,7 +43,7 @@ def load_excel_data():
 
 # Mapaj ocjene na strategije
 def map_scores_to_strategies(scores_dict, threshold=4):
-    uzroci_df, strategije_df = load_excel_data()
+    uzroci_df, strategije_df = get_excel_data()
 
     # Kreiraj dict sa ocjenama
     scored_uzroci = []
@@ -240,7 +253,7 @@ def submit_form():
 
 @app.route('/api/uzroci', methods=['GET'])
 def get_uzroci():
-    uzroci_df, _ = load_excel_data()
+    uzroci_df, _ = get_excel_data()
     uzroci_list = uzroci_df[['ID_uzroka', 'Naziv_uzroka']].to_dict('records')
     return jsonify(uzroci_list), 200
 
