@@ -148,7 +148,7 @@ function App() {
           </div>
 
           <div className="results-list">
-            {results.uzroci.map((uzrok, idx) => (
+            {results.uzroci.slice(0, 1).map((uzrok, idx) => (
               <div key={uzrok.id} className={`result-card result-card-${Math.min(uzrok.score, 5)}`}>
                 <div className="result-header">
                   <h3>#{idx + 1} {uzrok.naziv}</h3>
@@ -161,8 +161,8 @@ function App() {
                 </div>
 
                 <div className="strategije">
-                  <h4>Strategije za rješenje:</h4>
-                  {uzrok.strategije.map((strat, i) => (
+                  <h4>Preporučena strategija za rješenje:</h4>
+                  {uzrok.strategije.slice(0, 1).map((strat, i) => (
                     <div key={i} className="strategija">
                       <p><strong>{i + 1}. {strat.naziv}</strong></p>
                       <p>{strat.objasnjenje}</p>
@@ -175,7 +175,13 @@ function App() {
           </div>
 
           <div className="cta-box">
-            <p>Rezultati su poslani na Vaš email. Provjerite inbox!</p>
+            <div className="email-message">
+              <p><strong>✉️ Ostale strategije se šalju na Vaš email</strong></p>
+              <p>Razumite kako najbolje iskoristiti ove rezultate:</p>
+              <a href="https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu" target="_blank" rel="noopener noreferrer" className="video-link">
+                ▶️ Pogledajte objašnjavajući video
+              </a>
+            </div>
           </div>
         </div>
       )}
