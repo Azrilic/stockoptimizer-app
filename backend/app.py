@@ -212,6 +212,7 @@ def send_email(to_email, subject, html_body):
 
 @app.route('/api/submit', methods=['POST'])
 def submit_form():
+    print(f"[DEBUG] POST /api/submit primljen - {datetime.now()}", flush=True)
     data = request.json
 
     ime = data.get('ime', '')
@@ -224,7 +225,9 @@ def submit_form():
 
     try:
         # Map scores to strategies
+        print(f"[DEBUG] Mapiranje uzroka - početo", flush=True)
         top_uzroci = map_scores_to_strategies(scores, threshold=4)
+        print(f"[DEBUG] Mapiranje uzroka - završeno, pronađeno: {len(top_uzroci)} uzroka", flush=True)
 
         if not top_uzroci:
             return jsonify({'error': 'Nema uzroka sa score >= 4'}), 400
