@@ -232,30 +232,14 @@ def submit_form():
         if not top_uzroci:
             return jsonify({'error': 'Nema uzroka sa score >= 4'}), 400
 
-        # VRATITI REZULTATE PRVO, prije nego šaljem mail (sprječava timeout)
-        print(f"[DEBUG] Vraćam JSON rezultate korisniku PRVO", flush=True)
-        response_data = jsonify({
+        # VRATITI REZULTATE BEZ EMAIL SLANJA (email je previše spora na free tier Render)
+        print(f"[DEBUG] Vraćam JSON rezultate - email slanje je DISABLED", flush=True)
+
+        return jsonify({
             'success': True,
-            'message': 'Rezultati su obrađeni!',
+            'message': 'Rezultati su obrađeni! ✅',
             'uzroci': top_uzroci
         }), 200
-
-        # Slanja email nakon što smo vratili rezultate (u pozadini, bez čekanja)
-        if EMAIL_ENABLED:
-            try:
-                print(f"[DEBUG] Gradi email HTML u pozadini", flush=True)
-                user_email_html = build_user_email_html(ime, top_uzroci)
-                admin_email_html = build_admin_email_html(ime, email, tvrtka, top_uzroci)
-                print(f"[DEBUG] Email HTML građen, počinje slanje (async)", flush=True)
-
-                # Send emails - timeout će biti ignoran jer korisnik već ima rezultate
-                send_email(email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
-                send_email(ANTONIO_EMAIL, f'NOVI LEAD - {ime}', admin_email_html)
-                print(f"[DEBUG] Mailovi poslani (async)", flush=True)
-            except Exception as email_error:
-                print(f"[DEBUG] Email greška (ignorirano jer je async): {email_error}", flush=True)
-
-        return response_data
 
     except Exception as e:
         print(f"Error: {e}")
