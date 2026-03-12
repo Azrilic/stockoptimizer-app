@@ -211,14 +211,19 @@ def send_email(to_email, subject, html_body):
         print(f"Email error: {e}")
         return False
 
-# Pošalji email u background threadu (asinkrono)
-def send_email_async(to_email, subject, html_body):
-    """Pošalji email u background threadu da ne blokira response"""
+# Pošalji email u background threadu (asinkrono) - bez blokade!
+def send_emails_async(user_email, user_name, company, top_uzroci):
+    """Gradi HTML i šalje email u background threadu - NE BLOKIRA response!"""
     def _send():
         try:
-            print(f"[DEBUG] Email thread started za {to_email}", flush=True)
-            send_email(to_email, subject, html_body)
-            print(f"[DEBUG] Email thread završen za {to_email}", flush=True)
+            print(f"[DEBUG] Email thread: Gradi HTML", flush=True)
+            user_email_html = build_user_email_html(user_name, top_uzroci)
+            admin_email_html = build_admin_email_html(user_name, user_email, company, top_uzroci)
+
+            print(f"[DEBUG] Email thread: Šalje mailove", flush=True)
+            send_email(user_email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
+            send_email(ANTONIO_EMAIL, f'NOVI LEAD - {user_name}', admin_email_html)
+            print(f"[DEBUG] Email thread: Gotovo!", flush=True)
         except Exception as e:
             print(f"[DEBUG] Email thread error: {e}", flush=True)
 
@@ -260,14 +265,10 @@ def submit_form():
         # Pokušaj slati email ALI bez čekanja - ako timeout-uje, ignoriraj
         if EMAIL_ENABLED:
             try:
-                print(f"[DEBUG] Počinje email slanje (async)", flush=True)
-                user_email_html = build_user_email_html(ime, top_uzroci)
-                admin_email_html = build_admin_email_html(ime, email, tvrtka, top_uzroci)
-
-                # Slanje mailova u BACKGROUND THREADU - ne čeka se SMTP!
-                send_email_async(email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
-                send_email_async(ANTONIO_EMAIL, f'NOVI LEAD - {ime}', admin_email_html)
-                print(f"[DEBUG] Email threadovi pokrenuti (background)", flush=True)
+                print(f"[DEBUG] Pokreće email thread (HTML building će biti u threadu)", flush=True)
+                # send_emails_async će graditi HTML i slati email u threadu - NE BLOKIRA!
+                send_emails_async(email, ime, tvrtka, top_uzroci)
+                print(f"[DEBUG] Email thread pokrenut - rezultati se vraćaju odmah!", flush=True)
             except Exception as email_error:
                 print(f"[DEBUG] Email greška (ignorirano): {email_error}", flush=True)
                 # Ne trebam zaustaviti - korisnik već ima rezultate!
