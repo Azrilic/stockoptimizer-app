@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: stockoptimizer-backend
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: "pip install --only-binary :all: -r requirements.txt"
+    startCommand: "gunicorn -w 1 -b 0.0.0.0:8000 app:app"
+    envVars:
+      - key: SENDER_EMAIL
+        scope: run
+      - key: SENDER_PASSWORD
+        scope: run
+      - key: ANTONIO_EMAIL
+        value: antonio.zrilic@logiko.hr
+      - key: WEBINAR_LINK
+        value: https://example.com/webinar
