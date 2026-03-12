@@ -232,18 +232,25 @@ def submit_form():
         if not top_uzroci:
             return jsonify({'error': 'Nema uzroka sa score >= 4'}), 400
 
+        print(f"[DEBUG] EMAIL_ENABLED: {EMAIL_ENABLED}", flush=True)
+
         # Build emails if enabled
         if EMAIL_ENABLED:
+            print(f"[DEBUG] Gradi email HTML", flush=True)
             user_email_html = build_user_email_html(ime, top_uzroci)
             admin_email_html = build_admin_email_html(ime, email, tvrtka, top_uzroci)
+            print(f"[DEBUG] Email HTML građen, počinje slanje", flush=True)
 
             # Send emails
             send_email(email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
             send_email(ANTONIO_EMAIL, f'NOVI LEAD - {ime}', admin_email_html)
+            print(f"[DEBUG] Mailovi poslani", flush=True)
             message = 'Rezultati su poslani na email!'
         else:
+            print(f"[DEBUG] Email slanje nije dostupno, vraćam rezultate", flush=True)
             message = 'Rezultati su obrađeni (email slanje nije dostupno).'
 
+        print(f"[DEBUG] Vraćam JSON rezultate", flush=True)
         return jsonify({
             'success': True,
             'message': message,
