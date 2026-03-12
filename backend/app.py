@@ -8,6 +8,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import base64
+import threading
 
 app = Flask(__name__)
 
@@ -191,7 +192,7 @@ def build_admin_email_html(ime, email, tvrtka, top_uzroci):
     """
     return html
 
-# Pošalji email
+# Pošalji email (synchronous)
 def send_email(to_email, subject, html_body):
     try:
         msg = MIMEMultipart('alternative')
@@ -209,6 +210,20 @@ def send_email(to_email, subject, html_body):
     except Exception as e:
         print(f"Email error: {e}")
         return False
+
+# Pošalji email u background threadu (asinkrono)
+def send_email_async(to_email, subject, html_body):
+    """Pošalji email u background threadu da ne blokira response"""
+    def _send():
+        try:
+            print(f"[DEBUG] Email thread started za {to_email}", flush=True)
+            send_email(to_email, subject, html_body)
+            print(f"[DEBUG] Email thread završen za {to_email}", flush=True)
+        except Exception as e:
+            print(f"[DEBUG] Email thread error: {e}", flush=True)
+
+    thread = threading.Thread(target=_send, daemon=True)
+    thread.start()
 
 @app.route('/api/submit', methods=['POST'])
 def submit_form():
@@ -249,10 +264,10 @@ def submit_form():
                 user_email_html = build_user_email_html(ime, top_uzroci)
                 admin_email_html = build_admin_email_html(ime, email, tvrtka, top_uzroci)
 
-                # Slanje mailova - ako se timeout-uje, to je OK jer korisnik već ima rezultate
-                send_email(email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
-                send_email(ANTONIO_EMAIL, f'NOVI LEAD - {ime}', admin_email_html)
-                print(f"[DEBUG] Mailovi poslani uspješno", flush=True)
+                # Slanje mailova u BACKGROUND THREADU - ne čeka se SMTP!
+                send_email_async(email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
+                send_email_async(ANTONIO_EMAIL, f'NOVI LEAD - {ime}', admin_email_html)
+                print(f"[DEBUG] Email threadovi pokrenuti (background)", flush=True)
             except Exception as email_error:
                 print(f"[DEBUG] Email greška (ignorirano): {email_error}", flush=True)
                 # Ne trebam zaustaviti - korisnik već ima rezultate!
