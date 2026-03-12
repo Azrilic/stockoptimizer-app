@@ -4,10 +4,11 @@ import './App.css';
 const API_BASE = process.env.REACT_APP_API_URL || 'https://stockoptimizer-api.onrender.com';
 
 function App() {
-  const [step, setStep] = useState('form'); // 'form' | 'results'
+  const [step, setStep] = useState('form'); // 'form' | 'results' | 'thankyou'
   const [loading, setLoading] = useState(false);
   const [uzroci, setUzroci] = useState([]);
   const [results, setResults] = useState(null);
+  const THANK_YOU_URL = 'https://e.logiko.hr/aa-1-1243-7836-2383';
 
   // Form state
   const [ime, setIme] = useState('');
@@ -57,7 +58,11 @@ function App() {
 
       if (data.success) {
         setResults(data);
-        setStep('results');
+        setStep('thankyou');
+        // Preusmjeri na Thank You URL nakon 3 sekunde
+        setTimeout(() => {
+          window.location.href = THANK_YOU_URL;
+        }, 3000);
       } else {
         alert('Error: ' + (data.error || 'Unknown error'));
       }
@@ -182,6 +187,18 @@ function App() {
                 ▶️ Pogledajte objašnjavajući video
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {step === 'thankyou' && (
+        <div className="thankyou-container">
+          <div className="thankyou-content">
+            <h1>Hvala! 🎉</h1>
+            <p>Vaši rezultati su obrađeni!</p>
+            <p>Email sa svim strategijama je na putu do vas...</p>
+            <div className="spinner"></div>
+            <p className="redirect-message">Preusmjeravamo vas na Thank You stranicu...</p>
           </div>
         </div>
       )}
