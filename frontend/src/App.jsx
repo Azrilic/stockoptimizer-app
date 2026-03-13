@@ -154,7 +154,18 @@ function App() {
               />
             </div>
 
-            <h3>Ocijeni probleme (1-5, 0 = nema problema)</h3>
+            <div className="form-explanation">
+              <h3>Kako funkcionira ovaj upitnik?</h3>
+              <p>
+                Ocijenite koliko svaki uzrok utječe na nekurentnu/preveliku zalihu (1=minimalno, 5=kritično).
+                Upitnik je organiziran po funkcijama - klikni na odjeljak da ga otvoriš.
+              </p>
+              <div className="score-legend">
+                <span className="legend-item"><span className="legend-badge" style={{background: '#28a745'}}></span> 1 = Minimalno</span>
+                <span className="legend-item"><span className="legend-badge" style={{background: '#ffc107'}}></span> 2-3 = Umjereno</span>
+                <span className="legend-item"><span className="legend-badge" style={{background: '#dc3545'}}></span> 4-5 = Kritično</span>
+              </div>
+            </div>
 
             <div className="accordion-list">
               {Object.keys(groupedProblems).map(category => (

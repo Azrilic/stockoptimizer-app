@@ -7,4 +7,3 @@ gunicorn==21.2.0
 setuptools>=65.0
 wheel
 numpy>=1.24.0
-mailchimp-marketing==3.0.80

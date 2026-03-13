@@ -5,8 +5,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 import threading
-import mailchimp_marketing as MailchimpMarketing
-from mailchimp_marketing.api_client import ApiClientError
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 app = Flask(__name__)
 
@@ -26,25 +27,18 @@ def get_excel_data():
         _STRATEGIJE_DF = excel_data['Strategije_master']
     return _UZROCI_DF, _STRATEGIJE_DF
 
-# Mailchimp config
-MAILCHIMP_API_KEY = os.getenv('MAILCHIMP_API_KEY', '')
-MAILCHIMP_SERVER_PREFIX = 'us4'
-SENDER_EMAIL = 'info@logiko.hr'
-ANTONIO_EMAIL = 'antonio.zrilic@logiko.hr'
+# Gmail SMTP config
+SENDER_EMAIL = os.getenv('SENDER_EMAIL', '')
+SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', '')
+ANTONIO_EMAIL = os.getenv('ANTONIO_EMAIL', 'antonio.zrilic@gmail.com')
 WEBINAR_LINK = 'https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu'
 
-# Inicijalizuj Mailchimp client
-try:
-    mailchimp = MailchimpMarketing.Client()
-    mailchimp.set_config({
-        "api_key": MAILCHIMP_API_KEY,
-        "server": MAILCHIMP_SERVER_PREFIX
-    })
-    EMAIL_ENABLED = True
-    print("[DEBUG] Mailchimp client je inicijaliziran", flush=True)
-except Exception as e:
-    EMAIL_ENABLED = False
-    print(f"[DEBUG] Mailchimp konfiguracija greška: {e}", flush=True)
+# Provjeri da li je email konfiguriran
+EMAIL_ENABLED = bool(SENDER_EMAIL and SENDER_PASSWORD)
+if EMAIL_ENABLED:
+    print("[DEBUG] Gmail SMTP je konfiguriran", flush=True)
+else:
+    print("[DEBUG] UPOZORENJE: SENDER_EMAIL ili SENDER_PASSWORD nisu postavljeni!", flush=True)
 
 # Loadaj Excel datoteke
 def load_excel_data():
@@ -203,25 +197,30 @@ def build_admin_email_html(ime, email, tvrtka, top_uzroci):
     """
     return html
 
-# Pošalji email preko Mailchimp API
+# Pošalji email preko Gmail SMTP
 def send_email(to_email, subject, html_body):
     try:
-        print(f"[DEBUG] Mailchimp: Šaljem email na {to_email}", flush=True)
+        print(f"[DEBUG] Gmail SMTP: Šaljem email na {to_email}", flush=True)
 
-        message = {
-            "from_email": SENDER_EMAIL,
-            "subject": subject,
-            "html": html_body,
-            "to": [{"email": to_email, "type": "to"}]
-        }
+        # Kreiraj MIME multipart message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = to_email
 
-        response = mailchimp.messages.send(message)
-        print(f"[DEBUG] Mailchimp odgovor: {response}", flush=True)
+        # Dodaj HTML dio
+        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+
+        # Spoji se na Gmail SMTP server i pošalji
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+
+        print(f"[DEBUG] Email uspješno poslan na {to_email}", flush=True)
         return True
 
-    except ApiClientError as e:
-        print(f"[DEBUG] Mailchimp API greška: {e.text}", flush=True)
-        return False
     except Exception as e:
         print(f"[DEBUG] Email greška: {e}", flush=True)
         return False
