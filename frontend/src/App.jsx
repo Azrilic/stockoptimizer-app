@@ -48,7 +48,7 @@ function App() {
       console.log('[DEBUG] Thank You stranica se prikazala, počinjem countdown...');
       const redirectTimer = setTimeout(() => {
         console.log('[DEBUG] Preusmjeravanja na:', THANK_YOU_URL);
-        window.location.href = THANK_YOU_URL;
+        window.top.location.href = THANK_YOU_URL;
       }, 3000);
 
       return () => clearTimeout(redirectTimer);
