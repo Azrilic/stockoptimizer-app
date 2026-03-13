@@ -27,7 +27,7 @@ def get_excel_data():
     return _UZROCI_DF, _STRATEGIJE_DF
 
 # Mailchimp config
-MAILCHIMP_API_KEY = os.getenv('MAILCHIMP_API_KEY', 'ab6eb48e86584a3bfbd49b014f35534f-us4')
+MAILCHIMP_API_KEY = os.getenv('MAILCHIMP_API_KEY', '')
 MAILCHIMP_SERVER_PREFIX = 'us4'
 SENDER_EMAIL = 'info@logiko.hr'
 ANTONIO_EMAIL = 'antonio.zrilic@logiko.hr'
