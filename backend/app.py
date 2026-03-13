@@ -4,11 +4,9 @@ import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import base64
 import threading
+import mailchimp_marketing as MailchimpMarketing
+from mailchimp_marketing.api_client import ApiClientError
 
 app = Flask(__name__)
 
@@ -28,12 +26,25 @@ def get_excel_data():
         _STRATEGIJE_DF = excel_data['Strategije_master']
     return _UZROCI_DF, _STRATEGIJE_DF
 
-# Email config
-SENDER_EMAIL = os.getenv('SENDER_EMAIL', '')
-SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', '')
-ANTONIO_EMAIL = 'antonio.zrilic@gmail.com'
-EMAIL_ENABLED = bool(SENDER_EMAIL and SENDER_PASSWORD)
+# Mailchimp config
+MAILCHIMP_API_KEY = os.getenv('MAILCHIMP_API_KEY', 'ab6eb48e86584a3bfbd49b014f35534f-us4')
+MAILCHIMP_SERVER_PREFIX = 'us4'
+SENDER_EMAIL = 'info@logiko.hr'
+ANTONIO_EMAIL = 'antonio.zrilic@logiko.hr'
 WEBINAR_LINK = 'https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu'
+
+# Inicijalizuj Mailchimp client
+try:
+    mailchimp = MailchimpMarketing.Client()
+    mailchimp.set_config({
+        "api_key": MAILCHIMP_API_KEY,
+        "server": MAILCHIMP_SERVER_PREFIX
+    })
+    EMAIL_ENABLED = True
+    print("[DEBUG] Mailchimp client je inicijaliziran", flush=True)
+except Exception as e:
+    EMAIL_ENABLED = False
+    print(f"[DEBUG] Mailchimp konfiguracija greška: {e}", flush=True)
 
 # Loadaj Excel datoteke
 def load_excel_data():
@@ -192,23 +203,27 @@ def build_admin_email_html(ime, email, tvrtka, top_uzroci):
     """
     return html
 
-# Pošalji email (synchronous)
+# Pošalji email preko Mailchimp API
 def send_email(to_email, subject, html_body):
     try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = to_email
+        print(f"[DEBUG] Mailchimp: Šaljem email na {to_email}", flush=True)
 
-        msg.attach(MIMEText(html_body, 'html'))
+        message = {
+            "from_email": SENDER_EMAIL,
+            "subject": subject,
+            "html": html_body,
+            "to": [{"email": to_email, "type": "to"}]
+        }
 
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(SENDER_EMAIL, SENDER_PASSWORD)
-            server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
-
+        response = mailchimp.messages.send(message)
+        print(f"[DEBUG] Mailchimp odgovor: {response}", flush=True)
         return True
+
+    except ApiClientError as e:
+        print(f"[DEBUG] Mailchimp API greška: {e.text}", flush=True)
+        return False
     except Exception as e:
-        print(f"Email error: {e}")
+        print(f"[DEBUG] Email greška: {e}", flush=True)
         return False
 
 # Pošalji email u background threadu (asinkrono) - bez blokade!
@@ -283,7 +298,7 @@ def submit_form():
 @app.route('/api/uzroci', methods=['GET'])
 def get_uzroci():
     uzroci_df, _ = get_excel_data()
-    uzroci_list = uzroci_df[['ID_uzroka', 'Naziv_uzroka']].to_dict('records')
+    uzroci_list = uzroci_df[['ID_uzroka', 'Naziv_uzroka', 'Područje']].to_dict('records')
     return jsonify(uzroci_list), 200
 
 @app.route('/health', methods=['GET'])

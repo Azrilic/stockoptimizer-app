@@ -16,6 +16,18 @@ function App() {
   const [tvrtka, setTvrtka] = useState('');
   const [scores, setScores] = useState({});
 
+  // Accordion state
+  const [expandedCategories, setExpandedCategories] = useState({});
+
+  // Category mapping sa custom nazivima
+  const categoryNames = {
+    'Nabava': 'Problemi sa dobavljačima i nabavom',
+    'Proizvodnja': 'Proizvodne opcije i rizici',
+    'Prodaja': 'Prodajne strategije & Zalihe',
+    'Tržište': 'Tržišni izazovi',
+    'Općenito politika': 'Kontrola zaliha & Upravljanje'
+  };
+
   // Load uzroci on mount
   useEffect(() => {
     fetch(`${API_BASE}/api/uzroci`)
@@ -30,12 +42,42 @@ function App() {
       .catch(err => console.error('Error loading uzroci:', err));
   }, []);
 
+  // Handle redirect kada se prikaže Thank You stranica
+  useEffect(() => {
+    if (step === 'thankyou') {
+      console.log('[DEBUG] Thank You stranica se prikazala, počinjem countdown...');
+      const redirectTimer = setTimeout(() => {
+        console.log('[DEBUG] Preusmjeravanja na:', THANK_YOU_URL);
+        window.location.href = THANK_YOU_URL;
+      }, 3000);
+
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [step]);
+
   const handleScoreChange = (uzrokId, value) => {
     setScores(prev => ({
       ...prev,
       [uzrokId]: parseInt(value) || 0
     }));
   };
+
+  const toggleCategory = (category) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
+  // Grupiraj probleme po kategorijama
+  const groupedProblems = uzroci.reduce((acc, u) => {
+    const category = u.Područje;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(u);
+    return acc;
+  }, {});
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -57,12 +99,9 @@ function App() {
       const data = await response.json();
 
       if (data.success) {
+        console.log('[DEBUG] Form submission uspješan, postavljam step na thankyou');
         setResults(data);
         setStep('thankyou');
-        // Preusmjeri na Thank You URL nakon 3 sekunde
-        setTimeout(() => {
-          window.location.href = THANK_YOU_URL;
-        }, 3000);
       } else {
         alert('Error: ' + (data.error || 'Unknown error'));
       }
@@ -117,23 +156,46 @@ function App() {
 
             <h3>Ocijeni probleme (1-5, 0 = nema problema)</h3>
 
-            <div className="uzroci-list">
-              {uzroci.map((u, idx) => (
-                <div key={u.ID_uzroka} className="uzrok-item">
-                  <label>{idx + 1}. {u.Naziv_uzroka}</label>
-                  <div className="slider-container">
-                    <input
-                      type="range"
-                      min="0"
-                      max="5"
-                      value={scores[u.ID_uzroka] || 0}
-                      onChange={(e) => handleScoreChange(u.ID_uzroka, e.target.value)}
-                      className="slider"
-                    />
-                    <span className={`score-badge score-${scores[u.ID_uzroka] || 0}`}>
-                      {scores[u.ID_uzroka] || 0}
+            <div className="accordion-list">
+              {Object.keys(groupedProblems).map(category => (
+                <div key={category} className="accordion-item">
+                  <div
+                    className="accordion-header"
+                    onClick={() => toggleCategory(category)}
+                  >
+                    <span className="accordion-toggle">
+                      {expandedCategories[category] ? '▼' : '▶'}
+                    </span>
+                    <span className="accordion-title">
+                      {categoryNames[category] || category}
+                    </span>
+                    <span className="accordion-count">
+                      ({groupedProblems[category].length})
                     </span>
                   </div>
+
+                  {expandedCategories[category] && (
+                    <div className="accordion-content">
+                      {groupedProblems[category].map((u, idx) => (
+                        <div key={u.ID_uzroka} className="uzrok-item">
+                          <label>{idx + 1}. {u.Naziv_uzroka}</label>
+                          <div className="slider-container">
+                            <input
+                              type="range"
+                              min="0"
+                              max="5"
+                              value={scores[u.ID_uzroka] || 0}
+                              onChange={(e) => handleScoreChange(u.ID_uzroka, e.target.value)}
+                              className="slider"
+                            />
+                            <span className={`score-badge score-${scores[u.ID_uzroka] || 0}`}>
+                              {scores[u.ID_uzroka] || 0}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
