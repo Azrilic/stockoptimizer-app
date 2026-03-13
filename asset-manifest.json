@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/stockoptimizer-app/static/css/main.a55f180c.css",
-    "main.js": "/stockoptimizer-app/static/js/main.16705ba1.js",
+    "main.css": "/stockoptimizer-app/static/css/main.f0d84066.css",
+    "main.js": "/stockoptimizer-app/static/js/main.1b76daeb.js",
     "index.html": "/stockoptimizer-app/index.html",
-    "main.a55f180c.css.map": "/stockoptimizer-app/static/css/main.a55f180c.css.map",
-    "main.16705ba1.js.map": "/stockoptimizer-app/static/js/main.16705ba1.js.map"
+    "main.f0d84066.css.map": "/stockoptimizer-app/static/css/main.f0d84066.css.map",
+    "main.1b76daeb.js.map": "/stockoptimizer-app/static/js/main.1b76daeb.js.map"
   },
   "entrypoints": [
-    "static/css/main.a55f180c.css",
-    "static/js/main.16705ba1.js"
+    "static/css/main.f0d84066.css",
+    "static/js/main.1b76daeb.js"
   ]
 }
