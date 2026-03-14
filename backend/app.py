@@ -25,16 +25,20 @@ def get_excel_data():
         _STRATEGIJE_DF = excel_data['Strategije_master']
     return _UZROCI_DF, _STRATEGIJE_DF
 
-# GHL Webhook config
-GHL_WEBHOOK_URL = os.getenv('GHL_WEBHOOK_URL', '')
+# GHL API config
+GHL_API_KEY = os.getenv('GHL_API_KEY', '')
+GHL_LOCATION_ID = os.getenv('GHL_LOCATION_ID', 'E2mJCt83LKm33GZMeHI2')
 WEBINAR_LINK = 'https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu'
 
-# Provjeri da li je webhook konfiguriran
-WEBHOOK_ENABLED = bool(GHL_WEBHOOK_URL)
-if WEBHOOK_ENABLED:
-    print("[DEBUG] GHL Webhook je konfiguriran", flush=True)
+# GHL Contacts API endpoint
+GHL_CONTACTS_API = 'https://rest.gohighlevel.com/v1/contacts/'
+
+# Provjeri da li je GHL API konfiguriran
+GHL_ENABLED = bool(GHL_API_KEY)
+if GHL_ENABLED:
+    print("[DEBUG] GHL API je konfiguriran", flush=True)
 else:
-    print("[DEBUG] UPOZORENJE: GHL_WEBHOOK_URL nije postavljen!", flush=True)
+    print("[DEBUG] UPOZORENJE: GHL_API_KEY nije postavljen!", flush=True)
 
 # Loadaj Excel datoteke
 def load_excel_data():
@@ -193,44 +197,61 @@ def build_admin_email_html(ime, email, tvrtka, top_uzroci):
     """
     return html
 
-# Pošalji podatke na GHL Webhook
-def send_to_ghl_webhook(user_name, user_email, company, top_uzroci):
+# Pošalji kontakt na GHL Contacts API
+def send_to_ghl_contacts_api(user_name, user_email, company, top_uzroci):
     try:
-        print(f"[DEBUG] GHL Webhook: Šaljem podatke za {user_email}", flush=True)
+        print(f"[DEBUG] GHL API: Kreiram kontakt za {user_email}", flush=True)
 
-        # Pripremi payload za GHL
+        # Pripremi strategije kao string za custom field
+        strategije_text = '\n\n'.join([
+            f"**{uzrok['naziv']} (Score: {uzrok['score']}/5)**\n" +
+            '\n'.join([f"- {strat['naziv']}: {strat['objasnjenje']}" for strat in uzrok['strategije']])
+            for uzrok in top_uzroci
+        ])
+
+        # Pripremi payload za GHL Contacts API
         payload = {
             'firstName': user_name.split()[0] if user_name else '',
             'lastName': ' '.join(user_name.split()[1:]) if len(user_name.split()) > 1 else '',
             'email': user_email,
-            'company': company,
-            'customData': {
-                'topUzroci': top_uzroci,
-                'timestamp': datetime.now().isoformat()
+            'companyName': company,
+            'tags': ['StockOptimizer', 'Detektiv'],
+            'customFieldValues': {
+                'topUzroci': strategije_text,
+                'submitTime': datetime.now().strftime("%d.%m.%Y %H:%M:%S")
             }
         }
 
-        # Pošalji POST na GHL webhook
-        response = requests.post(GHL_WEBHOOK_URL, json=payload, timeout=10)
+        # Pošalji POST na GHL Contacts API
+        headers = {
+            'Authorization': f'Bearer {GHL_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+
+        # GHL Location ID trebam dodati u URL
+        url = f"{GHL_CONTACTS_API}?locationId={GHL_LOCATION_ID}"
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
 
         if response.status_code in [200, 201, 202]:
-            print(f"[DEBUG] GHL Webhook uspješan - Status: {response.status_code}", flush=True)
+            print(f"[DEBUG] GHL API uspješan - Status: {response.status_code}", flush=True)
+            print(f"[DEBUG] Odgovor: {response.json()}", flush=True)
             return True
         else:
-            print(f"[DEBUG] GHL Webhook greška - Status: {response.status_code}", flush=True)
+            print(f"[DEBUG] GHL API greška - Status: {response.status_code}", flush=True)
+            print(f"[DEBUG] Odgovor: {response.text}", flush=True)
             return False
 
     except Exception as e:
-        print(f"[DEBUG] GHL Webhook greška: {e}", flush=True)
+        print(f"[DEBUG] GHL API greška: {e}", flush=True)
         return False
 
 # Pošalji podatke na GHL u background threadu (asinkrono) - bez blokade!
 def send_to_ghl_async(user_email, user_name, company, top_uzroci):
-    """Šalje podatke na GHL webhook u background threadu - NE BLOKIRA response!"""
+    """Šalje kontakt na GHL Contacts API u background threadu - NE BLOKIRA response!"""
     def _send():
         try:
             print(f"[DEBUG] GHL thread: Počinje slanje", flush=True)
-            send_to_ghl_webhook(user_name, user_email, company, top_uzroci)
+            send_to_ghl_contacts_api(user_name, user_email, company, top_uzroci)
             print(f"[DEBUG] GHL thread: Gotovo!", flush=True)
         except Exception as e:
             print(f"[DEBUG] GHL thread error: {e}", flush=True)
@@ -260,8 +281,8 @@ def submit_form():
         if not top_uzroci:
             return jsonify({'error': 'Nema uzroka sa score >= 4'}), 400
 
-        # Vratiti rezultate PRVO, pa onda slati na GHL webhook (bez čekanja)
-        print(f"[DEBUG] WEBHOOK_ENABLED: {WEBHOOK_ENABLED}", flush=True)
+        # Vratiti rezultate PRVO, pa onda slati na GHL API (bez čekanja)
+        print(f"[DEBUG] GHL_ENABLED: {GHL_ENABLED}", flush=True)
 
         # Kreiraj JSON odgovor koji se vraća odmah
         response_json = {
@@ -271,14 +292,14 @@ def submit_form():
         }
 
         # Pokušaj slati na GHL ALI bez čekanja - ako timeout-uje, ignoriraj
-        if WEBHOOK_ENABLED:
+        if GHL_ENABLED:
             try:
-                print(f"[DEBUG] Pokreće GHL webhook thread", flush=True)
-                # send_to_ghl_async će slati podatke u threadu - NE BLOKIRA!
+                print(f"[DEBUG] Pokreće GHL API thread", flush=True)
+                # send_to_ghl_async će slati kontakt na GHL u threadu - NE BLOKIRA!
                 send_to_ghl_async(email, ime, tvrtka, top_uzroci)
-                print(f"[DEBUG] GHL thread pokrenut - rezultati se vraćaju odmah!", flush=True)
-            except Exception as webhook_error:
-                print(f"[DEBUG] GHL greška (ignorirano): {webhook_error}", flush=True)
+                print(f"[DEBUG] GHL API thread pokrenut - rezultati se vraćaju odmah!", flush=True)
+            except Exception as ghl_error:
+                print(f"[DEBUG] GHL greška (ignorirano): {ghl_error}", flush=True)
                 # Ne trebam zaustaviti - korisnik već ima rezultate!
 
         print(f"[DEBUG] Vraćam JSON rezultate korisniku", flush=True)

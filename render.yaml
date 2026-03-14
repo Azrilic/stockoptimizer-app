@@ -7,7 +7,9 @@ services:
     buildCommand: "pip install --only-binary :all: -r requirements.txt"
     startCommand: "gunicorn -w 1 -b 0.0.0.0:8000 app:app"
     envVars:
-      - key: GHL_WEBHOOK_URL
+      - key: GHL_API_KEY
         scope: run
+      - key: GHL_LOCATION_ID
+        value: E2mJCt83LKm33GZMeHI2
       - key: WEBINAR_LINK
         value: https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu
