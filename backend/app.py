@@ -5,9 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 import threading
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 
 app = Flask(__name__)
 
@@ -27,18 +25,16 @@ def get_excel_data():
         _STRATEGIJE_DF = excel_data['Strategije_master']
     return _UZROCI_DF, _STRATEGIJE_DF
 
-# Gmail SMTP config
-SENDER_EMAIL = os.getenv('SENDER_EMAIL', '')
-SENDER_PASSWORD = os.getenv('SENDER_PASSWORD', '')
-ANTONIO_EMAIL = os.getenv('ANTONIO_EMAIL', 'antonio.zrilic@gmail.com')
+# GHL Webhook config
+GHL_WEBHOOK_URL = os.getenv('GHL_WEBHOOK_URL', '')
 WEBINAR_LINK = 'https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu'
 
-# Provjeri da li je email konfiguriran
-EMAIL_ENABLED = bool(SENDER_EMAIL and SENDER_PASSWORD)
-if EMAIL_ENABLED:
-    print("[DEBUG] Gmail SMTP je konfiguriran", flush=True)
+# Provjeri da li je webhook konfiguriran
+WEBHOOK_ENABLED = bool(GHL_WEBHOOK_URL)
+if WEBHOOK_ENABLED:
+    print("[DEBUG] GHL Webhook je konfiguriran", flush=True)
 else:
-    print("[DEBUG] UPOZORENJE: SENDER_EMAIL ili SENDER_PASSWORD nisu postavljeni!", flush=True)
+    print("[DEBUG] UPOZORENJE: GHL_WEBHOOK_URL nije postavljen!", flush=True)
 
 # Loadaj Excel datoteke
 def load_excel_data():
@@ -197,49 +193,47 @@ def build_admin_email_html(ime, email, tvrtka, top_uzroci):
     """
     return html
 
-# Pošalji email preko Gmail SMTP
-def send_email(to_email, subject, html_body):
+# Pošalji podatke na GHL Webhook
+def send_to_ghl_webhook(user_name, user_email, company, top_uzroci):
     try:
-        print(f"[DEBUG] Gmail SMTP: Šaljem email na {to_email}", flush=True)
+        print(f"[DEBUG] GHL Webhook: Šaljem podatke za {user_email}", flush=True)
 
-        # Kreiraj MIME multipart message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = to_email
+        # Pripremi payload za GHL
+        payload = {
+            'firstName': user_name.split()[0] if user_name else '',
+            'lastName': ' '.join(user_name.split()[1:]) if len(user_name.split()) > 1 else '',
+            'email': user_email,
+            'company': company,
+            'customData': {
+                'topUzroci': top_uzroci,
+                'timestamp': datetime.now().isoformat()
+            }
+        }
 
-        # Dodaj HTML dio
-        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+        # Pošalji POST na GHL webhook
+        response = requests.post(GHL_WEBHOOK_URL, json=payload, timeout=10)
 
-        # Spoji se na Gmail SMTP server i pošalji
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-
-        print(f"[DEBUG] Email uspješno poslan na {to_email}", flush=True)
-        return True
+        if response.status_code in [200, 201, 202]:
+            print(f"[DEBUG] GHL Webhook uspješan - Status: {response.status_code}", flush=True)
+            return True
+        else:
+            print(f"[DEBUG] GHL Webhook greška - Status: {response.status_code}", flush=True)
+            return False
 
     except Exception as e:
-        print(f"[DEBUG] Email greška: {e}", flush=True)
+        print(f"[DEBUG] GHL Webhook greška: {e}", flush=True)
         return False
 
-# Pošalji email u background threadu (asinkrono) - bez blokade!
-def send_emails_async(user_email, user_name, company, top_uzroci):
-    """Gradi HTML i šalje email u background threadu - NE BLOKIRA response!"""
+# Pošalji podatke na GHL u background threadu (asinkrono) - bez blokade!
+def send_to_ghl_async(user_email, user_name, company, top_uzroci):
+    """Šalje podatke na GHL webhook u background threadu - NE BLOKIRA response!"""
     def _send():
         try:
-            print(f"[DEBUG] Email thread: Gradi HTML", flush=True)
-            user_email_html = build_user_email_html(user_name, top_uzroci)
-            admin_email_html = build_admin_email_html(user_name, user_email, company, top_uzroci)
-
-            print(f"[DEBUG] Email thread: Šalje mailove", flush=True)
-            send_email(user_email, f'StockOptimizer Detektiv – Vaši rezultati ({datetime.now().strftime("%d.%m.%Y")})', user_email_html)
-            send_email(ANTONIO_EMAIL, f'NOVI LEAD - {user_name}', admin_email_html)
-            print(f"[DEBUG] Email thread: Gotovo!", flush=True)
+            print(f"[DEBUG] GHL thread: Počinje slanje", flush=True)
+            send_to_ghl_webhook(user_name, user_email, company, top_uzroci)
+            print(f"[DEBUG] GHL thread: Gotovo!", flush=True)
         except Exception as e:
-            print(f"[DEBUG] Email thread error: {e}", flush=True)
+            print(f"[DEBUG] GHL thread error: {e}", flush=True)
 
     thread = threading.Thread(target=_send, daemon=True)
     thread.start()
@@ -266,8 +260,8 @@ def submit_form():
         if not top_uzroci:
             return jsonify({'error': 'Nema uzroka sa score >= 4'}), 400
 
-        # Vratiti rezultate PRVO, pa onda slati email (bez čekanja na SMTP timeout)
-        print(f"[DEBUG] EMAIL_ENABLED: {EMAIL_ENABLED}", flush=True)
+        # Vratiti rezultate PRVO, pa onda slati na GHL webhook (bez čekanja)
+        print(f"[DEBUG] WEBHOOK_ENABLED: {WEBHOOK_ENABLED}", flush=True)
 
         # Kreiraj JSON odgovor koji se vraća odmah
         response_json = {
@@ -276,15 +270,15 @@ def submit_form():
             'uzroci': top_uzroci
         }
 
-        # Pokušaj slati email ALI bez čekanja - ako timeout-uje, ignoriraj
-        if EMAIL_ENABLED:
+        # Pokušaj slati na GHL ALI bez čekanja - ako timeout-uje, ignoriraj
+        if WEBHOOK_ENABLED:
             try:
-                print(f"[DEBUG] Pokreće email thread (HTML building će biti u threadu)", flush=True)
-                # send_emails_async će graditi HTML i slati email u threadu - NE BLOKIRA!
-                send_emails_async(email, ime, tvrtka, top_uzroci)
-                print(f"[DEBUG] Email thread pokrenut - rezultati se vraćaju odmah!", flush=True)
-            except Exception as email_error:
-                print(f"[DEBUG] Email greška (ignorirano): {email_error}", flush=True)
+                print(f"[DEBUG] Pokreće GHL webhook thread", flush=True)
+                # send_to_ghl_async će slati podatke u threadu - NE BLOKIRA!
+                send_to_ghl_async(email, ime, tvrtka, top_uzroci)
+                print(f"[DEBUG] GHL thread pokrenut - rezultati se vraćaju odmah!", flush=True)
+            except Exception as webhook_error:
+                print(f"[DEBUG] GHL greška (ignorirano): {webhook_error}", flush=True)
                 # Ne trebam zaustaviti - korisnik već ima rezultate!
 
         print(f"[DEBUG] Vraćam JSON rezultate korisniku", flush=True)

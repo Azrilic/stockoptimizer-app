@@ -7,11 +7,7 @@ services:
     buildCommand: "pip install --only-binary :all: -r requirements.txt"
     startCommand: "gunicorn -w 1 -b 0.0.0.0:8000 app:app"
     envVars:
-      - key: SENDER_EMAIL
-        scope: run
-      - key: SENDER_PASSWORD
-        scope: run
-      - key: ANTONIO_EMAIL
+      - key: GHL_WEBHOOK_URL
         scope: run
       - key: WEBINAR_LINK
         value: https://api.leadconnectorhq.com/widget/booking/Z5TZs90rLSeZxnaP7eAu

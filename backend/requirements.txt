@@ -7,3 +7,4 @@ gunicorn==21.2.0
 setuptools>=65.0
 wheel
 numpy>=1.24.0
+requests==2.31.0
