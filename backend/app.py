@@ -3,9 +3,11 @@ import json
 import pandas as pd
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, timedelta
 import threading
 import requests
+import anthropic
+import base64
 
 app = Flask(__name__)
 
@@ -325,6 +327,229 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
     return response
+
+# ============================================
+# SOCIAL AGENT - Generiraj članak iz social posta
+# ============================================
+
+# Config
+WP_URL = os.getenv('WP_URL', 'https://logiko.hr')
+WP_USERNAME = os.getenv('WP_USERNAME', 'antonio')
+WP_APP_PASSWORD = os.getenv('WP_APP_PASSWORD', '')
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+WHATSAPP_NUMBER = os.getenv('WHATSAPP_NUMBER', '')
+
+def generate_article_with_claude(post_content, image_url=None):
+    """Generiraj SEO članak iz social media posta koristeći Claude"""
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    prompt = f"""Na osnovu ovog social media posta napiši SEO optimiziran blog članak za logiko.hr.
+
+Social media post:
+{post_content}
+
+Upute za članak:
+- Dužina: 600-800 riječi
+- Jezik: hrvatski
+- Ton: profesionalan ali pristupačan
+- Struktura: uvod, 3-4 podnaslova (H2), zaključak
+- SEO: uključi relevantne ključne riječi prirodno
+- Format: HTML (koristi <h2>, <p>, <strong> tagove)
+- NE uključuj <html>, <head>, <body> tagove
+- Naslov članka stavi na prvoj liniji kao: NASLOV: [naslov ovdje]
+
+Napiši članak:"""
+
+    response = client.messages.create(
+        model="claude-opus-4-8",
+        max_tokens=2000,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    full_response = response.content[0].text
+
+    # Izvuci naslov i sadržaj
+    lines = full_response.strip().split('\n')
+    title = "Blog članak"
+    content = full_response
+
+    if lines[0].startswith("NASLOV:"):
+        title = lines[0].replace("NASLOV:", "").strip()
+        content = '\n'.join(lines[1:]).strip()
+
+    return title, content
+
+def create_wordpress_draft(title, content, scheduled_date, image_url=None):
+    """Kreiraj WordPress draft sa datumom četvrtak tjedan ranije"""
+
+    # Datum objave = četvrtak tjedan ranije od scheduled_date
+    if scheduled_date:
+        try:
+            post_date = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+        except:
+            post_date = datetime.now() + timedelta(days=14)
+    else:
+        post_date = datetime.now() + timedelta(days=14)
+
+    # Nađi četvrtak tjedan ranije
+    days_until_thursday = (post_date.weekday() - 3) % 7  # 3 = četvrtak
+    article_date = post_date - timedelta(days=days_until_thursday + 7)
+    article_date = article_date.replace(hour=8, minute=0, second=0)
+
+    # WP auth
+    credentials = base64.b64encode(f"{WP_USERNAME}:{WP_APP_PASSWORD}".encode()).decode()
+    headers = {
+        'Authorization': f'Basic {credentials}',
+        'Content-Type': 'application/json'
+    }
+
+    # Kreiraj WP post
+    wp_data = {
+        'title': title,
+        'content': content,
+        'status': 'draft',
+        'date': article_date.strftime('%Y-%m-%dT%H:%M:%S'),
+        'author': 1
+    }
+
+    response = requests.post(
+        f"{WP_URL}/wp-json/wp/v2/posts",
+        json=wp_data,
+        headers=headers,
+        timeout=30
+    )
+
+    if response.status_code in [200, 201]:
+        wp_post = response.json()
+        return wp_post.get('link', ''), wp_post.get('id', ''), article_date
+    else:
+        print(f"[SOCIAL] WP greška: {response.status_code} - {response.text}", flush=True)
+        return None, None, None
+
+def update_ghl_post_first_comment(post_id, article_link):
+    """Dodaj first comment na GHL social post sa linkom na članak"""
+    if not post_id:
+        return False
+
+    headers = {
+        'Authorization': f'Bearer {GHL_API_KEY}',
+        'Content-Type': 'application/json',
+        'Version': '2021-07-28'
+    }
+
+    response = requests.put(
+        f"https://services.leadconnectorhq.com/social-media-posting/posts/{post_id}",
+        json={'firstComment': f'📖 Pročitaj cijeli članak na blogu: {article_link}'},
+        headers=headers,
+        timeout=15
+    )
+
+    print(f"[SOCIAL] GHL update: {response.status_code}", flush=True)
+    return response.status_code in [200, 201]
+
+def send_whatsapp_notification(article_link, article_date, post_preview):
+    """Pošalji WhatsApp notifikaciju za review članka"""
+    if not GHL_API_KEY or not WHATSAPP_NUMBER:
+        return False
+
+    review_date = article_date.strftime('%d.%m.%Y')
+
+    message = f"""📝 *Novi WP draft spreman za review!*
+
+Post: _{post_preview[:80]}..._
+
+👉 Review članak: {article_link}
+
+⚠️ Objavi članak do: *{review_date}*
+(dan prije nego post ide live)"""
+
+    headers = {
+        'Authorization': f'Bearer {GHL_API_KEY}',
+        'Content-Type': 'application/json',
+        'Version': '2021-07-28'
+    }
+
+    payload = {
+        'type': 'WhatsApp',
+        'message': message,
+        'contactPhone': WHATSAPP_NUMBER,
+        'locationId': GHL_LOCATION_ID
+    }
+
+    response = requests.post(
+        'https://services.leadconnectorhq.com/conversations/messages',
+        json=payload,
+        headers=headers,
+        timeout=15
+    )
+
+    print(f"[SOCIAL] WhatsApp: {response.status_code}", flush=True)
+    return response.status_code in [200, 201]
+
+@app.route('/webhook/social-post', methods=['POST'])
+def handle_social_post():
+    """
+    Webhook endpoint - prima podatke iz Zapiera kada se objavi FB post
+    Generiše članak, kreira WP draft, updatea GHL post sa first comment
+    """
+    print(f"[SOCIAL] Webhook primljen - {datetime.now()}", flush=True)
+
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Nema podataka'}), 400
+
+    post_content = data.get('post_content', '')
+    image_url = data.get('image_url', '')
+    scheduled_date = data.get('scheduled_date', '')
+    ghl_post_id = data.get('ghl_post_id', '')
+
+    if not post_content:
+        return jsonify({'error': 'Nema sadržaja posta'}), 400
+
+    try:
+        # 1. Generiraj članak sa Claudeom
+        print("[SOCIAL] Generiram članak sa Claudeom...", flush=True)
+        title, content = generate_article_with_claude(post_content, image_url)
+        print(f"[SOCIAL] Članak generiran: {title}", flush=True)
+
+        # 2. Kreiraj WordPress draft
+        print("[SOCIAL] Kreiram WP draft...", flush=True)
+        article_link, wp_id, article_date = create_wordpress_draft(
+            title, content, scheduled_date, image_url
+        )
+
+        if not article_link:
+            return jsonify({'error': 'WP draft nije kreiran'}), 500
+
+        print(f"[SOCIAL] WP draft kreiran: {article_link}", flush=True)
+
+        # 3. Updatea GHL post sa first comment (u background threadu)
+        if ghl_post_id:
+            threading.Thread(
+                target=update_ghl_post_first_comment,
+                args=(ghl_post_id, article_link),
+                daemon=True
+            ).start()
+
+        # 4. Pošalji WhatsApp notifikaciju (u background threadu)
+        threading.Thread(
+            target=send_whatsapp_notification,
+            args=(article_link, article_date, post_content),
+            daemon=True
+        ).start()
+
+        return jsonify({
+            'success': True,
+            'article_link': article_link,
+            'wp_id': wp_id,
+            'article_date': article_date.strftime('%d.%m.%Y') if article_date else '',
+            'title': title
+        }), 200
+
+    except Exception as e:
+        print(f"[SOCIAL] Greška: {e}", flush=True)
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=False, port=5000)
