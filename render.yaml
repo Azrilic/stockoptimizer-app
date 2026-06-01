@@ -5,10 +5,10 @@ services:
     region: frankfurt
     plan: free
     buildCommand: "pip install --only-binary :all: -r requirements.txt"
-    startCommand: "gunicorn -w 1 -b 0.0.0.0:8000 app:app"
+    startCommand: "gunicorn -w 1 -b 0.0.0.0:8000 --timeout 120 app:app"
     envVars:
       - key: GHL_API_KEY
-        scope: run
+        sync: false
       - key: GHL_LOCATION_ID
         value: E2mJCt83LKm33GZMeHI2
       - key: WEBINAR_LINK
