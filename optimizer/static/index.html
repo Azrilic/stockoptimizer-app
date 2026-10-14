@@ -87,9 +87,20 @@ footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
     <label class="drop" id="drop" tabindex="0">
       <input type="file" id="datoteka" name="datoteka" accept=".xlsx,.xls,.csv">
       <strong id="imeDatoteke">Povucite izvoz ovdje ili kliknite za odabir</strong>
-      <span>Excel ili CSV · jedan redak po artiklu · 12 mjeseci prodaje</span>
+      <span>Excel ili CSV · najmanje: šifra artikla + 12 mjeseci prodaje (količine)</span>
     </label>
     <p style="margin:10px 0 0"><a class="link" href="/api/predlozak.xlsx">Preuzmi predložak s primjerom i uputama</a></p>
+    <details style="margin-top:10px">
+      <summary>Što dobijete s kojim podacima</summary>
+      <ul class="plain">
+        <li><b>Šifra + 12 mjeseci prodaje:</b> ABC/XYZ, sigurnosna zaliha, točka naručivanja i količina po narudžbi.</li>
+        <li><b>+ trenutna zaliha:</b> koliko točno naručiti ovaj tjedan (i + <i>na putu</i>, da se ne naruči dvaput).</li>
+        <li><b>+ nabavna cijena:</b> pravi EOQ i vrijednosti u eurima.</li>
+        <li><b>+ dobavljač:</b> narudžba razdvojena po dobavljaču.</li>
+        <li><b>+ prosječna zaliha:</b> obrtaj, status artikla i usporedba zaliha s prodajom.</li>
+        <li><b>+ lead time:</b> stvarni rokovi isporuke umjesto zadanih.</li>
+      </ul>
+    </details>
 
     <details style="margin-top:14px">
       <summary>Pretpostavke (zadane vrijednosti obično odgovaraju)</summary>
@@ -99,6 +110,7 @@ footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
         <label>Razina usluge C (%)<input type="number" name="razina_c" value="90" min="51" max="99.9" step="1"></label>
         <label>Trošak jedne narudžbe (€)<input type="number" name="trosak_narudzbe" value="60" min="0" step="1"><small>Administracija, prijevoz, zaprimanje – po narudžbi, neovisno o količini.</small></label>
         <label>Trošak držanja (% godišnje)<input type="number" name="drzanje_postotak" value="20" min="1" step="1"><small>Kapital, prostor, osiguranje, kalo – kao % nabavne cijene.</small></label>
+        <label>Pokrivenost bez nabavne cijene (tjedni)<input type="number" name="pokrivenost_tjedana" value="4" min="1" step="1"><small>Količina po narudžbi kad izvoz nema nabavnu cijenu (EOQ nije moguć).</small></label>
         <label>Zadani lead time (dani)<input type="number" name="lead_time_default" value="21" min="1" step="1"><small>Koristi se za artikle bez lead timea u izvozu.</small></label>
       </div>
     </details>
@@ -173,18 +185,19 @@ async function preuzmi(url, ime) {
 function prikazi(d) {
   const s = d.sazetak;
   $("#rezultat").classList.remove("hidden");
+  const ima$ = s.ima_cijene;
   $("#hero").innerHTML = (d.ima_narudzbu
     ? `<div class="hero">
         <div class="stat"><b>${fmt(s.narudzba_stavki)}</b><span>artikala za naručiti</span></div>
-        <div class="stat"><b>${eur(s.narudzba_vrijednost)}</b><span>vrijednost narudžbe</span></div>
-        <div class="stat"><b>${d.dobavljaci.filter((x) => x.stavki_narudzbe > 0).length}</b><span>dobavljača</span></div>
+        ${ima$ ? `<div class="stat"><b>${eur(s.narudzba_vrijednost)}</b><span>vrijednost narudžbe</span></div>` : ""}
+        <div class="stat"><b>${d.dobavljaci.filter((x) => x.stavki_narudzbe > 0).length}</b><span>${d.dobavljaci.length === 1 && d.dobavljaci[0].dobavljac === "(svi artikli)" ? "narudžba" : "dobavljača"}</span></div>
       </div>`
-    : `<p style="margin:0">Izvoz nema stupac <b>Trenutna zaliha</b>, pa ne mogu odrediti što treba naručiti ovaj tjedan. Prikazujem samo količinu po narudžbi (EOQ). Dodajte stupac i izračunajte ponovno.</p>`) +
+    : `<p style="margin:0">Izvoz nema stupac <b>Trenutna zaliha</b>, pa ne mogu odrediti što treba naručiti ovaj tjedan. Za svaki artikl ipak dobivate sigurnosnu zalihu, točku naručivanja i količinu po narudžbi (kartica <i>Svi artikli</i>). Dodajte trenutnu zalihu i izračunajte ponovno.</p>`) +
     `<div class="row" style="margin-top:16px">
-      <button type="button" id="dlCsv">Preuzmi narudžbu (CSV za ERP)</button>
-      <button type="button" class="ghost btn" id="dlXls">Preuzmi cijeli rezultat (Excel)</button>
+      ${d.ima_narudzbu ? '<button type="button" id="dlCsv">Preuzmi narudžbu (CSV za ERP)</button>' : ""}
+      <button type="button" class="${d.ima_narudzbu ? "ghost " : ""}btn" id="dlXls">Preuzmi cijeli rezultat (Excel)</button>
     </div>`;
-  $("#dlCsv").onclick = () => preuzmi("/api/narudzba.csv", "narudzba.csv");
+  if ($("#dlCsv")) $("#dlCsv").onclick = () => preuzmi("/api/narudzba.csv", "narudzba.csv");
   $("#dlXls").onclick = () => preuzmi("/api/izvoz.xlsx", "stockoptimizer-rezultat.xlsx");
   $("#upozorenja").innerHTML = d.upozorenja.map((u) => `<div class="warn">${esc(u)}</div>`).join("");
 
@@ -193,32 +206,36 @@ function prikazi(d) {
   $("#nasNarudzba").classList.toggle("hidden", !d.ima_narudzbu);
   $("#dobavljaci").innerHTML = d.ima_narudzbu ? (ul.length ? ul.map((x, i) => `
     <details class="sup" ${i === 0 ? "open" : ""}>
-      <summary>${esc(x.dobavljac)} <span>${x.stavki_narudzbe} stavki · ${eur(x.vrijednost_narudzbe)}</span></summary>
+      <summary>${esc(x.dobavljac)} <span>${x.stavki_narudzbe} stavki${ima$ ? " · " + eur(x.vrijednost_narudzbe) : ""}</span></summary>
       <div class="scroll"><table>
-        <thead><tr><th>Šifra</th><th>Naziv</th><th class="n">Količina</th><th class="n">Nabavna</th><th class="n">Vrijednost</th></tr></thead>
-        <tbody>${(poDob[x.dobavljac] || []).map((n) => `<tr><td>${esc(n.sifra)}</td><td>${esc(n.naziv)}</td><td class="n"><b>${fmt(n.kolicina)}</b></td><td class="n">${fmt(n.nabavna_cijena, 2)}</td><td class="n">${fmt(n.vrijednost, 2)}</td></tr>`).join("")}</tbody>
+        <thead><tr><th>Šifra</th><th>Naziv</th><th class="n">Količina</th>${ima$ ? '<th class="n">Nabavna</th><th class="n">Vrijednost</th>' : ""}</tr></thead>
+        <tbody>${(poDob[x.dobavljac] || []).map((n) => `<tr><td>${esc(n.sifra)}</td><td>${esc(n.naziv)}</td><td class="n"><b>${fmt(n.kolicina)}</b></td>${ima$ ? `<td class="n">${fmt(n.nabavna_cijena, 2)}</td><td class="n">${fmt(n.vrijednost, 2)}</td>` : ""}</tr>`).join("")}</tbody>
       </table></div>
     </details>`).join("") : `<div class="card">Nijedan artikl trenutno nije na ili ispod točke naručivanja. Ništa se ne naručuje.</div>`) : "";
 
   // Zašto
   const polja = {}; d.uskladjenost.forEach((u) => (polja[u.polje] = u));
-  let mx = '<div class="h"></div><div class="h">X (stabilna)</div><div class="h">Y (promjenjiva)</div><div class="h">Z (nepravilna)</div>';
-  for (const a of "ABC") { mx += `<div class="h">${a}</div>`; for (const x of "XYZ") { const u = polja[a + x];
+  let mx = ""; if (d.uskladjenost.length) mx = '<div class="h"></div><div class="h">X (stabilna)</div><div class="h">Y (promjenjiva)</div><div class="h">Z (nepravilna)</div>';
+  if (d.uskladjenost.length) for (const a of "ABC") { mx += `<div class="h">${a}</div>`; for (const x of "XYZ") { const u = polja[a + x];
     mx += `<div class="c ${u.nalaz === "uredno" ? "" : "nalaz"} ${u.smjer === "ok" ? "" : u.smjer}"><b>${esc(a + x)}</b>prodaja ${fmt(u.udio_prodaja, 1)}%<br>zalihe ${fmt(u.udio_zaliha, 1)}%<br>${u.odstupanje > 0 ? "+" : ""}${fmt(u.odstupanje, 1)} p.b.</div>`; } }
+  const stat = (v, txt) => v == null ? "" : `<div class="stat"><b>${v}</b><span>${txt}</span></div>`;
+  const matrica = d.uskladjenost.length ? `<div class="mx">${mx}</div>
+    <p style="color:var(--muted);font-size:.82rem">Zdravo je kad se udio u zalihama poklapa s udjelom u prodaji. Crveni okvir: rizik manjka na artiklima koji nose prihod. Žuti okvir: novac zarobljen u zalihama koje malo zarađuju. Pragovi: 2 p.b. vrijedi spomenuti, 5 p.b. je nalaz; za A artikle i zalihe ispod 80% udjela u prodaji.</p>` : "";
   $("#t1").innerHTML = `<h2>Struktura zaliha naspram prodaje</h2>
     <p style="margin-top:0">${s.recenice.map(esc).join(" ")}</p>
-    <div class="mx">${mx}</div>
-    <p style="color:var(--muted);font-size:.82rem">Zdravo je kad se udio u zalihama poklapa s udjelom u prodaji. Crveni okvir: rizik manjka na artiklima koji nose prihod. Žuti okvir: novac zarobljen u zalihama koje malo zarađuju. Pragovi: 2 p.b. vrijedi spomenuti, 5 p.b. je nalaz; za A artikle i zalihe ispod 80% udjela u prodaji.</p>
+    ${matrica}
     <div class="hero">
-      <div class="stat"><b>${s.obrtaj ? fmt(s.obrtaj, 1) + "×" : "–"}</b><span>obrtaj zaliha godišnje</span></div>
-      <div class="stat"><b>${s.dani_zalihe ? fmt(s.dani_zalihe) : "–"}</b><span>dana zalihe</span></div>
-      <div class="stat"><b>${eur(s.vrijednost_visak)}</b><span>zalihe u višku ili bez prodaje</span></div>
-      <div class="stat"><b>${eur(s.vrijednost_sigurnosnih)}</b><span>vrijednost sigurnosnih zaliha</span></div>
-    </div>`;
+      ${stat(s.obrtaj ? fmt(s.obrtaj, 1) + "×" : null, "obrtaj zaliha godišnje")}
+      ${stat(s.dani_zalihe ? fmt(s.dani_zalihe) : null, "dana zalihe")}
+      ${stat(s.vrijednost_visak != null ? eur(s.vrijednost_visak) : null, "zalihe u višku ili bez prodaje")}
+      ${stat(s.vrijednost_sigurnosnih != null ? eur(s.vrijednost_sigurnosnih) : null, "vrijednost sigurnosnih zaliha")}
+      ${stat(fmt(s.broj_artikala), "artikala u analizi")}
+    </div>
+    <p style="color:var(--muted);font-size:.82rem">ABC osnova: ${esc(s.abc_osnova)}.</p>`;
 
   // Artikli
   const imaN = d.ima_narudzbu;
-  $("#t2").innerHTML = `<div class="scroll"><table><thead><tr><th>Šifra</th><th>Naziv</th><th>Klasa</th><th class="n">Potraž. god.</th><th class="n">Sig. zaliha</th><th class="n">Točka nar.</th><th class="n">EOQ</th>${imaN ? '<th class="n">Trenutna</th><th class="n">Za naručiti</th>' : ""}<th class="n">Prosj. zaliha</th><th>Status</th></tr></thead><tbody>${
+  $("#t2").innerHTML = `<div class="scroll"><table><thead><tr><th>Šifra</th><th>Naziv</th><th>Klasa</th><th class="n">Potraž. god.</th><th class="n">Sig. zaliha</th><th class="n">Točka nar.</th><th class="n">Kol. po narudžbi</th>${imaN ? '<th class="n">Trenutna</th><th class="n">Za naručiti</th>' : ""}<th class="n">Prosj. zaliha</th><th>Status</th></tr></thead><tbody>${
     d.artikli.map((a) => `<tr><td>${esc(a.sifra)}</td><td>${esc(a.naziv)}</td><td>${esc(a.klasa)}</td><td class="n">${fmt(a.potraznja_god)}</td><td class="n">${fmt(Math.ceil(a.sigurnosna))}</td><td class="n">${fmt(Math.ceil(a.tocka_naruc))}</td><td class="n">${fmt(a.eoq)}</td>${imaN ? `<td class="n">${fmt(a.trenutna)}</td><td class="n"><b>${fmt(a.narudzba)}</b></td>` : ""}<td class="n">${fmt(a.zaliha)}</td><td><span class="tag ${esc(String(a.status).split(" ")[0])}">${esc(a.status)}</span></td></tr>`).join("")}</tbody></table></div>`;
 
   $("#t3").innerHTML = `<h2>Na čemu počiva</h2><ul class="plain">${d.pretpostavke.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`;

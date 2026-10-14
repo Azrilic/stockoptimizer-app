@@ -21,7 +21,7 @@ def main(argv=None) -> int:
     d = Parametri()
     for ime in ("razina_a", "razina_b", "razina_c"):
         ap.add_argument(f"--{ime.replace('_', '-')}", type=int, default=getattr(d, ime))
-    for ime in ("trosak_narudzbe", "drzanje_postotak", "lead_time_default", "abc_a", "abc_b", "xyz_x", "xyz_y"):
+    for ime in ("trosak_narudzbe", "drzanje_postotak", "lead_time_default", "pokrivenost_tjedana", "abc_a", "abc_b", "xyz_x", "xyz_y"):
         ap.add_argument(f"--{ime.replace('_', '-')}", type=float, default=getattr(d, ime))
     a = ap.parse_args(argv)
 

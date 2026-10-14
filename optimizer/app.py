@@ -17,7 +17,7 @@ app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 POLJA = {
     "razina_a": int, "razina_b": int, "razina_c": int,
     "trosak_narudzbe": float, "drzanje_postotak": float, "lead_time_default": float,
-    "abc_a": float, "abc_b": float, "xyz_x": float, "xyz_y": float,
+    "pokrivenost_tjedana": float, "abc_a": float, "abc_b": float, "xyz_x": float, "xyz_y": float,
 }
 
 
@@ -30,8 +30,8 @@ def parametri_iz(src) -> Parametri:
                 setattr(p, k, tip(str(v).replace(",", ".")))
             except ValueError as e:
                 raise GreskaUnosa(f"Parametar '{k}' nije ispravan broj.") from e
-    if p.trosak_narudzbe < 0 or p.drzanje_postotak <= 0 or p.lead_time_default <= 0:
-        raise GreskaUnosa("Trošak narudžbe ne smije biti negativan, a držanje i lead time moraju biti veći od nule.")
+    if p.trosak_narudzbe < 0 or p.drzanje_postotak <= 0 or p.lead_time_default <= 0 or p.pokrivenost_tjedana <= 0:
+        raise GreskaUnosa("Trošak narudžbe ne smije biti negativan, a držanje, lead time i pokrivenost moraju biti veći od nule.")
     if not (0 < p.abc_a < p.abc_b <= 100):
         raise GreskaUnosa("Granice ABC moraju biti rastuće i najviše 100%.")
     if not (0 < p.xyz_x < p.xyz_y):
@@ -84,7 +84,7 @@ def analiziraj():
     stavke = engine.narudzba_csv(a)
     imamo_narudzbu = bool(a["narudzba"].notna().any())
     cols = ["sifra", "naziv", "dobavljac", "klasa", "potraznja_god", "sigurnosna", "tocka_naruc", "eoq",
-            "zaliha", "obrtaj", "dani_zalihe", "vrijednost_zalihe", "status", "lt_dani", "lt_izvor"]
+            "eoq_izvor", "zaliha", "obrtaj", "dani_zalihe", "vrijednost_zalihe", "status", "lt_dani", "lt_izvor"]
     if imamo_narudzbu:
         cols += ["trenutna", "na_putu", "narudzba", "vrijednost_narudzbe"] if "na_putu" in a else \
             ["trenutna", "narudzba", "vrijednost_narudzbe"]

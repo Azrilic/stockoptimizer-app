@@ -20,9 +20,22 @@ Zadano: razine usluge A 98 % / B 95 % / C 90 %, S = 60 € po narudžbi, h = 20 
 
 ## Ulaz
 
-Excel ili CSV, jedan redak po artiklu. Obavezno: Šifra, Naziv, Dobavljač, Nabavna cijena, Prodajna cijena,
-Prosječna zaliha i točno 12 stupaca mjesečne prodaje. Za količinu za narudžbu treba **Trenutna zaliha**,
-a preporučeno je i **Na putu**. Opcionalno: Lead time (dani), MOQ, Pakiranje. Predložak: `/api/predlozak.xlsx`.
+Excel ili CSV. **Obavezno je samo: šifra artikla i 12 uzastopnih stupaca s mjesečnom prodajom (količine).**
+Sve ostalo je dodatak koji otključava dodatne rezultate:
+
+| Dodatni stupac | Što otključava | Bez njega |
+|---|---|---|
+| Trenutna zaliha | količina za naručiti ovaj tjedan | samo sigurnosna zaliha, točka naručivanja i količina po narudžbi |
+| Na putu | ne naručuje se dvaput | narudžba ne uzima u obzir već naručeno (upozorenje) |
+| Nabavna cijena | pravi EOQ, vrijednosti u € | količina po narudžbi = potražnja za 4 tjedna (parametar) |
+| Prodajna cijena | ABC po prometu u € | ABC po nabavnoj vrijednosti, a bez cijena po količini |
+| Prosječna zaliha | obrtaj, status, usporedba zaliha i prodaje | koristi se trenutna zaliha, ako je ima |
+| Dobavljač | narudžba razdvojena po dobavljaču | jedna zajednička narudžba |
+| Lead time (dani) | stvarni rokovi | zadano 21 dan |
+| Naziv, MOQ, Pakiranje | čitljivost, zaokruživanje | – |
+
+Mjeseci moraju stajati jedan do drugoga; ako uz njih postoje drugi brojčani stupci koji ih prekidaju ili ih ima više
+od 12 uzastopno, aplikacija javlja grešku umjesto da pogađa. Predložak: `/api/predlozak.xlsx`.
 
 ## Pokretanje
 

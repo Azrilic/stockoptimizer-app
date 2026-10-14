@@ -121,3 +121,63 @@ def test_lead_time_konstantan_upozorenje():
 def test_z_vrijednosti():
     assert z_vrijednost(95) == 1.65 and z_vrijednost(99) == 2.33
     assert z_vrijednost(97) == pytest.approx(1.88, abs=0.01)
+
+
+def minimalni(redovi):
+    d = []
+    for i, m in enumerate(redovi):
+        r = {"Šifra": f"S{i}"}
+        r.update({f"mj{k}": v for k, v in enumerate(m, 1)})
+        d.append(r)
+    return pd.DataFrame(d)
+
+
+def test_minimalni_ulaz_samo_sifra_i_12_mjeseci():
+    m = [[100, 120, 80, 110, 90, 105, 95, 115, 85, 100, 125, 75], [10] * 12, [0] * 11 + [30]]
+    d, _ = priprema(minimalni(m))
+    r = izracunaj(d, Parametri())
+    a = r.artikli
+    assert list(a["abc"]) == ["A", "C", "C"] or set(a["abc"]) <= {"A", "B", "C"}
+    assert (a["sigurnosna"] >= 0).all() and a["sigurnosna"].iloc[0] > 0
+    assert (a["tocka_naruc"] > 0).all()
+    # bez cijene: količina = potražnja za 4 tjedna
+    assert a["eoq_izvor"].eq("pokrivenost").all()
+    assert a.loc[1, "eoq"] == math.ceil(120 / 52 * 4)
+    assert r.sazetak["ima_cijene"] is False and r.sazetak["vrijednost_zaliha"] is None
+    assert r.uskladjenost.empty
+    assert np.isnan(a["narudzba"]).all()
+    assert narudzba_csv(a).empty
+
+
+def test_samo_trenutna_zaliha_daje_narudzbu_bez_cijena():
+    m = [[100] * 12, [100] * 12]
+    df = minimalni(m)
+    df["Trenutna zaliha"] = [0, 5000]
+    d, _ = priprema(df)
+    r = izracunaj(d, Parametri())
+    n = narudzba_csv(r.artikli)
+    assert list(n.columns) == ["dobavljac", "sifra", "naziv", "kolicina"]
+    assert list(n["sifra"]) == ["S0"]
+    assert n["kolicina"].iloc[0] > 0
+
+
+def test_suvisni_numericki_stupac_i_ukupno_stupac():
+    df = minimalni([[10] * 12, [20] * 12])
+    df["Ukupno"] = 120
+    df["Grupa"] = [1, 2]
+    d, upoz = priprema(df)
+    assert any("Grupa" in u for u in upoz)
+    assert d["m1"].tolist() == [10, 20] and d["m12"].tolist() == [10, 20]  # 'Ukupno' i 'Grupa' nisu mjeseci
+
+
+def test_nejasni_mjeseci_su_greska_a_ne_tiho_pomicanje():
+    df = minimalni([[10] * 12, [20] * 12])
+    df.insert(5, "Grupa", [1, 2])  # usred mjeseci → nijedan niz od 12
+    with pytest.raises(GreskaUnosa):
+        priprema(df)
+
+
+def test_manje_od_12_mjeseci_je_greska():
+    df = minimalni([[1] * 12]).drop(columns=["mj12"])
+    with pytest.raises(GreskaUnosa):
+        priprema(df)
