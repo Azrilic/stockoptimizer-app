@@ -1,0 +1,472 @@
+"""Izračun ABC/XYZ, sigurnosne zalihe, točke naručivanja i EOQ.
+
+Sigurnosna zaliha koristi pojednostavljenu formulu bez varijabilnosti roka isporuke:
+    SZ = z * sigma_D * sqrt(LT)
+gdje je sigma_D standardna devijacija mjesečne potražnje, a LT rok isporuke
+izražen u mjesecima (dani / DANA_U_MJESECU).
+"""
+
+from __future__ import annotations
+
+import io
+import math
+import re
+from dataclasses import dataclass, field, asdict
+
+import numpy as np
+import pandas as pd
+
+DANA_U_MJESECU = 30.0
+
+Z_PO_RAZINI = {90: 1.28, 95: 1.65, 98: 2.05, 99: 2.33}
+
+ALIASI = {
+    "sifra": ["sifra", "šifra", "code", "sku", "artikl", "item"],
+    "naziv": ["naziv", "name", "opis", "description"],
+    "dobavljac": ["dobavljac", "dobavljač", "supplier", "vendor"],
+    "nabavna": ["nabavna", "nabavna cijena", "nabavna_cijena", "cost", "unit cost"],
+    "prodajna": ["prodajna", "prodajna cijena", "prodajna_cijena", "price", "unit price"],
+    "zaliha": ["prosjecna zaliha", "prosječna zaliha", "prosjecna_zaliha", "zaliha", "avg stock", "stock"],
+    "trenutna": ["trenutna zaliha", "trenutna_zaliha", "stanje", "na stanju", "on hand", "current stock"],
+    "na_putu": ["na putu", "naruceno", "naručeno", "otvorene narudzbe", "otvorene narudžbe", "on order", "in transit"],
+    "lead_time": ["lead time", "lead_time", "leadtime", "rok isporuke", "rok", "lt"],
+    "moq": ["moq", "min narudzba", "min. narudžba", "minimalna narudzba"],
+    "pakiranje": ["pakiranje", "pack", "pack size", "paket"],
+}
+
+OBAVEZNI = ["sifra", "naziv", "dobavljac", "nabavna", "prodajna", "zaliha"]
+OZNAKE_UKUPNO = {"total", "ukupno", "sveukupno", "grand total", "sum", "zbroj"}
+
+
+class GreskaUnosa(Exception):
+    """Podaci kupca nisu upotrebljivi; poruka je namijenjena kupcu."""
+
+
+@dataclass
+class Parametri:
+    razina_a: int = 98
+    razina_b: int = 95
+    razina_c: int = 90
+    trosak_narudzbe: float = 60.0   # S, EUR po narudžbi
+    drzanje_postotak: float = 20.0  # h, % nabavne cijene godišnje (H = h * nabavna)
+    lead_time_default: float = 21.0  # dani, kad izvoz nema lead time
+    abc_a: float = 80.0
+    abc_b: float = 95.0
+    xyz_x: float = 0.5
+    xyz_y: float = 1.0
+
+    def z_za(self, klasa: str) -> float:
+        razina = {"A": self.razina_a, "B": self.razina_b, "C": self.razina_c}[klasa]
+        return z_vrijednost(razina)
+
+
+def z_vrijednost(razina: float) -> float:
+    """Z za razinu usluge u postocima; tablične vrijednosti, inače inverz normalne razdiobe."""
+    r = int(round(razina))
+    if r in Z_PO_RAZINI:
+        return Z_PO_RAZINI[r]
+    from statistics import NormalDist
+    if not 50 < razina < 100:
+        raise GreskaUnosa(f"Razina usluge {razina}% nije dopuštena (mora biti između 50 i 100).")
+    return round(NormalDist().inv_cdf(razina / 100.0), 2)
+
+
+@dataclass
+class Rezultat:
+    artikli: pd.DataFrame
+    uskladjenost: pd.DataFrame
+    sazetak: dict
+    upozorenja: list[str] = field(default_factory=list)
+    pretpostavke: list[str] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------- učitavanje
+
+def _norm(s) -> str:
+    return re.sub(r"\s+", " ", str(s).strip().lower())
+
+
+def ucitaj(sadrzaj: bytes, ime_datoteke: str) -> pd.DataFrame:
+    ime = ime_datoteke.lower()
+    try:
+        if ime.endswith((".xlsx", ".xlsm", ".xls")):
+            return pd.read_excel(io.BytesIO(sadrzaj))
+        if ime.endswith((".csv", ".txt")):
+            return pd.read_csv(io.BytesIO(sadrzaj), sep=None, engine="python", decimal=",") \
+                if b";" in sadrzaj[:2000] else pd.read_csv(io.BytesIO(sadrzaj), sep=None, engine="python")
+    except Exception as e:  # noqa: BLE001
+        raise GreskaUnosa(f"Datoteku nije moguće pročitati: {e}") from e
+    raise GreskaUnosa("Podržani su formati .xlsx i .csv.")
+
+
+def priprema(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Mapira stupce, čisti podatke i vraća (standardizirani okvir, upozorenja)."""
+    upoz: list[str] = []
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    mapa: dict[str, str] = {}
+    for kanon, aliasi in ALIASI.items():
+        for stupac in df.columns:
+            if _norm(stupac) in aliasi and stupac not in mapa.values():
+                mapa[kanon] = stupac
+                break
+
+    nedostaju = [k for k in OBAVEZNI if k not in mapa]
+    if nedostaju:
+        imena = {"sifra": "šifra", "naziv": "naziv", "dobavljac": "dobavljač",
+                 "nabavna": "nabavna cijena", "prodajna": "prodajna cijena",
+                 "zaliha": "prosječna zaliha"}
+        raise GreskaUnosa("U izvozu nedostaju obavezni stupci: " + ", ".join(imena[k] for k in nedostaju) + ".")
+
+    ostali = [c for c in df.columns if c not in mapa.values()]
+    mjeseci = [c for c in ostali if pd.to_numeric(df[c], errors="coerce").notna().sum() > 0]
+    if len(mjeseci) != 12:
+        raise GreskaUnosa(
+            f"Očekujem točno 12 stupaca s mjesečnom prodajom, a pronašao sam {len(mjeseci)}. "
+            "Svi ostali stupci osim obaveznih (i opcionalnih lead time, MOQ, pakiranje) moraju biti uklonjeni.")
+
+    out = pd.DataFrame({k: df[v] for k, v in mapa.items()})
+    for i, c in enumerate(mjeseci, 1):
+        out[f"m{i}"] = pd.to_numeric(df[c], errors="coerce")
+
+    # retci "Total"
+    maska_total = out["sifra"].astype(str).map(_norm).isin(OZNAKE_UKUPNO) | \
+        out["naziv"].astype(str).map(_norm).isin(OZNAKE_UKUPNO)
+    if maska_total.any():
+        upoz.append(f"Uklonjeno redaka s ukupnim zbrojem: {int(maska_total.sum())}.")
+        out = out[~maska_total]
+    prazni = out["sifra"].isna() | (out["sifra"].astype(str).str.strip() == "")
+    if prazni.any():
+        upoz.append(f"Uklonjeno redaka bez šifre: {int(prazni.sum())}.")
+        out = out[~prazni]
+    if out.empty:
+        raise GreskaUnosa("Nakon čišćenja nema nijednog artikla.")
+
+    for c in ["nabavna", "prodajna", "zaliha"] + [f"m{i}" for i in range(1, 13)]:
+        out[c] = pd.to_numeric(out[c], errors="coerce")
+    for c in ("lead_time", "moq", "pakiranje", "trenutna", "na_putu"):
+        if c in out:
+            out[c] = pd.to_numeric(out[c], errors="coerce")
+
+    mcols = [f"m{i}" for i in range(1, 13)]
+    if out["m12"].fillna(0).sum() == 0:
+        upoz.append("Zadnji mjesec nema nikakve prodaje. Provjerite je li izvoz završen s tekućim mjesecom.")
+    neg = (out[mcols] < 0).sum().sum()
+    if neg:
+        upoz.append(f"Pronađeno je {int(neg)} negativnih mjesečnih prodaja (povrati ili storna). Tretirane su kao 0.")
+    out[mcols] = out[mcols].clip(lower=0).fillna(0)
+
+    for c in ("nabavna", "prodajna", "zaliha"):
+        losi = out[c].isna() | (out[c] < 0)
+        if losi.any():
+            upoz.append(f"{int(losi.sum())} artikala nema ispravan podatak '{c}' i zamijenjeno je s 0.")
+            out[c] = out[c].where(~losi, 0)
+    out["dobavljac"] = out["dobavljac"].fillna("(bez dobavljača)").astype(str)
+    out["sifra"] = out["sifra"].astype(str)
+    if out["sifra"].duplicated().any():
+        upoz.append(f"Šifre se ponavljaju u {int(out['sifra'].duplicated().sum())} redaka; svaki redak računa se zasebno.")
+    return out.reset_index(drop=True), upoz
+
+
+# ------------------------------------------------------------------ izračun
+
+def _round_up(x: float, korak: float) -> float:
+    return math.ceil(x / korak - 1e-9) * korak if korak and korak > 0 else x
+
+
+def izracunaj(df: pd.DataFrame, p: Parametri, upozorenja: list[str] | None = None) -> Rezultat:
+    upoz = list(upozorenja or [])
+    pretp: list[str] = []
+    mcols = [f"m{i}" for i in range(1, 13)]
+    a = df.copy()
+
+    a["potraznja_god"] = a[mcols].sum(axis=1)
+    a["potraznja_mj"] = a["potraznja_god"] / 12.0
+    a["sigma_mj"] = a[mcols].std(axis=1, ddof=1)
+    a["cv"] = np.where(a["potraznja_mj"] > 0, a["sigma_mj"] / a["potraznja_mj"].replace(0, np.nan), np.nan)
+    a["promet"] = a["potraznja_god"] * a["prodajna"]
+
+    # ABC po godišnjem prometu, kumulativno
+    ukupno = a["promet"].sum()
+    if ukupno <= 0:
+        raise GreskaUnosa("Ukupni promet je nula; provjerite prodajne cijene i mjesečne količine.")
+    red = a.sort_values("promet", ascending=False)
+    kum_prije = (red["promet"].cumsum() - red["promet"]) / ukupno * 100
+    abc = np.where(kum_prije < p.abc_a, "A", np.where(kum_prije < p.abc_b, "B", "C"))
+    a.loc[red.index, "abc"] = abc
+    a.loc[a["promet"] <= 0, "abc"] = "C"
+
+    a["xyz"] = np.where(a["potraznja_god"] <= 0, "Z",
+                        np.where(a["cv"] <= p.xyz_x, "X", np.where(a["cv"] <= p.xyz_y, "Y", "Z")))
+    a["klasa"] = a["abc"] + a["xyz"]
+
+    # lead time
+    if "lead_time" in a:
+        nema_lt = a["lead_time"].isna() | (a["lead_time"] <= 0)
+        a["lt_izvor"] = np.where(nema_lt, "default", "izvoz")
+        a["lt_dani"] = a["lead_time"].where(~nema_lt, p.lead_time_default)
+        if nema_lt.any():
+            upoz.append(f"{int(nema_lt.sum())} artikala nema lead time; korišteno je {p.lead_time_default:g} dana.")
+        mjereni = a.loc[~nema_lt, "lt_dani"]
+        if len(mjereni) > 1 and mjereni.nunique() == 1:
+            upoz.append(f"Svi artikli imaju isti lead time ({mjereni.iloc[0]:g} dana). Je li to stvarni ugovoreni rok "
+                        "ili privremena vrijednost? Ako varira, sigurnosne su zalihe podcijenjene.")
+    else:
+        a["lt_dani"] = p.lead_time_default
+        a["lt_izvor"] = "default"
+        upoz.append(f"Izvoz nema lead time; za sve artikle korišteno je {p.lead_time_default:g} dana.")
+
+    a["z"] = a["abc"].map(p.z_za)
+    a["sigurnosna"] = a["z"] * a["sigma_mj"].fillna(0) * np.sqrt(a["lt_dani"] / DANA_U_MJESECU)
+    a["potraznja_dan"] = a["potraznja_mj"] / DANA_U_MJESECU
+    a["tocka_naruc"] = a["potraznja_dan"] * a["lt_dani"] + a["sigurnosna"]
+
+    H = (p.drzanje_postotak / 100.0) * a["nabavna"]
+    eoq = np.sqrt(2.0 * a["potraznja_god"] * p.trosak_narudzbe / H.replace(0, np.nan))
+    a["eoq_osnovni"] = eoq.fillna(0)
+    q = a["eoq_osnovni"].copy()
+    if "moq" in a:
+        q = np.maximum(q, a["moq"].fillna(0))
+    a["eoq"] = q
+    if "pakiranje" in a:
+        a["eoq"] = [_round_up(x, k) if k and not pd.isna(k) else x for x, k in zip(a["eoq"], a["pakiranje"])]
+    a["eoq"] = np.where(a["potraznja_god"] > 0, np.ceil(a["eoq"]), 0)
+    a["narudzbi_god"] = np.where(a["eoq"] > 0, a["potraznja_god"] / a["eoq"].replace(0, np.nan), 0)
+
+    # količina za narudžbu: (s, Q) pravilo nad zalihom na stanju + na putu
+    if "trenutna" in a:
+        na_putu = a["na_putu"].fillna(0) if "na_putu" in a else 0.0
+        a["pozicija"] = a["trenutna"].fillna(0) + na_putu
+        manjak = a["tocka_naruc"] - a["pozicija"]
+        treba = (a["potraznja_god"] > 0) & (manjak >= 0) & (a["eoq"] > 0)
+        n = np.where(treba, np.maximum(1, np.floor(manjak / a["eoq"].replace(0, np.nan)).fillna(0) + 1), 0)
+        a["narudzba"] = n * a["eoq"]
+        a["vrijednost_narudzbe"] = a["narudzba"] * a["nabavna"]
+        if "na_putu" not in a:
+            upoz.append("Izvoz nema stupac 'Na putu'. Količine za narudžbu ne uzimaju u obzir već naručenu robu.")
+    else:
+        a["narudzba"] = np.nan
+        a["vrijednost_narudzbe"] = np.nan
+        upoz.append("Izvoz nema stupac 'Trenutna zaliha', pa ne mogu odrediti što treba naručiti ovaj tjedan. "
+                    "Prikazana je samo količina po narudžbi (EOQ).")
+
+    # obrtaj (nabavna vrijednost prodaje / prosječna zaliha po nabavnoj = D / prosječna zaliha)
+    a["obrtaj"] = np.where(a["zaliha"] > 0, a["potraznja_god"] / a["zaliha"].replace(0, np.nan), np.nan)
+    a["dani_zalihe"] = np.where(a["potraznja_dan"] > 0, a["zaliha"] / a["potraznja_dan"].replace(0, np.nan), np.nan)
+    a["vrijednost_zalihe"] = a["zaliha"] * a["nabavna"]
+
+    # status (procjena na temelju prosječne zalihe, ne trenutnog stanja)
+    gornja = a["sigurnosna"] + a["eoq"]
+
+    def status(r_zaliha, r_prodaja, r_sz, r_gornja):
+        if r_prodaja <= 0:
+            return "Nema prodaje" if r_zaliha > 0 else "Neaktivan"
+        if r_zaliha < r_sz:
+            return "Rizik manjka"
+        if r_zaliha <= r_gornja:
+            return "Uredno"
+        if r_zaliha <= 2 * r_gornja:
+            return "Višak"
+        return "Ozbiljan višak"
+
+    a["status"] = [status(z, d, s, g) for z, d, s, g in
+                   zip(a["zaliha"], a["potraznja_god"], a["sigurnosna"], gornja)]
+
+    uskl = _uskladjenost(a)
+    saz = _sazetak(a, uskl, p)
+
+    pretp += [
+        f"Sigurnosna zaliha = z × σ potražnje × √LT (bez varijabilnosti roka isporuke); z po klasi: "
+        f"A {p.razina_a}% ({p.z_za('A')}), B {p.razina_b}% ({p.z_za('B')}), C {p.razina_c}% ({p.z_za('C')}).",
+        "Ova sigurnosna zaliha pretpostavlja da rok isporuke ne varira. To je donja granica.",
+        f"EOQ = √(2 × godišnja potražnja × S / H), uz S = {p.trosak_narudzbe:g} € po narudžbi i "
+        f"H = {p.drzanje_postotak:g}% nabavne cijene godišnje.",
+        f"ABC po godišnjem prometu (A do {p.abc_a:g}%, B do {p.abc_b:g}% kumulativno); "
+        f"XYZ po koeficijentu varijacije (X ≤ {p.xyz_x:g}, Y ≤ {p.xyz_y:g}).",
+        f"Mjesec se računa kao {DANA_U_MJESECU:g} dana; σ potražnje je uzorkovana standardna devijacija 12 mjeseci.",
+        "Narudžba: ako je zaliha na stanju plus na putu na ili ispod točke naručivanja, naručuje se višekratnik EOQ-a "
+        "(zaokruženo na MOQ i pakiranje) dovoljan da pozicija prijeđe točku naručivanja.",
+        "Status zalihe uspoređuje prosječnu zalihu sa sigurnosnom zalihom i EOQ-om; to je procjena, ne trenutno stanje.",
+    ]
+    return Rezultat(a, uskl, saz, upoz, pretp)
+
+
+def _uskladjenost(a: pd.DataFrame) -> pd.DataFrame:
+    ukupno_prodaja = a["promet"].sum()
+    ukupno_zaliha = a["vrijednost_zalihe"].sum()
+    redovi = []
+    for abc in "ABC":
+        for xyz in "XYZ":
+            m = (a["abc"] == abc) & (a["xyz"] == xyz)
+            up = a.loc[m, "promet"].sum() / ukupno_prodaja * 100 if ukupno_prodaja else 0.0
+            uz = a.loc[m, "vrijednost_zalihe"].sum() / ukupno_zaliha * 100 if ukupno_zaliha else 0.0
+            odst = uz - up
+            nalaz = "uredno"
+            if abs(odst) >= 5:
+                nalaz = "nalaz"
+            elif abs(odst) >= 2:
+                nalaz = "spomenuti"
+            rizik = False
+            if abc == "A" and up > 0 and uz < 0.8 * up:
+                rizik = True
+                nalaz = "nalaz"
+            smjer = "ok"
+            if rizik or odst <= -2:
+                smjer = "stockout"
+            elif odst >= 2:
+                smjer = "kapital"
+            redovi.append({"polje": abc + xyz, "artikala": int(m.sum()),
+                           "udio_prodaja": up, "udio_zaliha": uz, "odstupanje": odst,
+                           "nalaz": nalaz, "smjer": smjer, "rizik_stockout_A": rizik})
+    return pd.DataFrame(redovi)
+
+
+def hr(x: float) -> str:
+    return f"{x:.1f}".replace(".", ",")
+
+
+def _sazetak(a: pd.DataFrame, uskl: pd.DataFrame, p: Parametri) -> dict:
+    vz = float(a["vrijednost_zalihe"].sum())
+    cogs = float((a["potraznja_god"] * a["nabavna"]).sum())
+    obrtaj = cogs / vz if vz > 0 else None
+    sz_vr = float((a["sigurnosna"] * a["nabavna"]).sum())
+    kapital = uskl[uskl["smjer"] == "kapital"].sort_values("odstupanje", ascending=False)
+    stock = uskl[uskl["smjer"] == "stockout"].sort_values("odstupanje")
+    r = []
+    if not stock.empty and stock.iloc[0]["nalaz"] != "uredno":
+        x = stock.iloc[0]
+        uvod = "Rizik manjka je" if x["nalaz"] == "nalaz" else "Blago manje zaliha nego prodaje je"
+        r.append(f"{uvod} u polju {x['polje']}: čini {hr(x['udio_prodaja'])}% prodaje, "
+                 f"a drži {hr(x['udio_zaliha'])}% vrijednosti zaliha.")
+    if not kapital.empty and kapital.iloc[0]["nalaz"] != "uredno":
+        k = kapital.iloc[0]
+        uvod = "Novac stoji" if k["nalaz"] == "nalaz" else "Blago više zaliha nego prodaje je"
+        r.append(f"{uvod} u polju {k['polje']}: nosi {hr(k['udio_prodaja'])}% prodaje, "
+                 f"a veže {hr(k['udio_zaliha'])}% vrijednosti zaliha.")
+    if not r:
+        r.append("Struktura zaliha uglavnom prati strukturu prodaje; nijedno polje ne odstupa više od 2 postotna boda.")
+    return {
+        "broj_artikala": int(len(a)),
+        "godisnji_promet": float(a["promet"].sum()),
+        "vrijednost_zaliha": vz,
+        "obrtaj": obrtaj,
+        "dani_zalihe": 365.0 / obrtaj if obrtaj else None,
+        "vrijednost_sigurnosnih": sz_vr,
+        "klase_abc": {k: int(v) for k, v in a["abc"].value_counts().items()},
+        "klase_xyz": {k: int(v) for k, v in a["xyz"].value_counts().items()},
+        "statusi": {k: int(v) for k, v in a["status"].value_counts().items()},
+        "narudzba_stavki": int((a["narudzba"] > 0).sum()) if a["narudzba"].notna().any() else None,
+        "narudzba_vrijednost": float(a["vrijednost_narudzbe"].sum()) if a["narudzba"].notna().any() else None,
+        "vrijednost_visak": float(a.loc[a["status"].isin(["Višak", "Ozbiljan višak", "Nema prodaje"]),
+                                        "vrijednost_zalihe"].sum()),
+        "recenice": r,
+    }
+
+
+def po_dobavljacu(a: pd.DataFrame) -> pd.DataFrame:
+    g = a.assign(vrijednost_eoq=a["eoq"] * a["nabavna"]).groupby("dobavljac").agg(
+        artikala=("sifra", "count"),
+        vrijednost_eoq=("vrijednost_eoq", "sum"),
+        vrijednost_sigurnosnih=("sigurnosna", lambda s: float((s * a.loc[s.index, "nabavna"]).sum())),
+        vrijednost_zalihe=("vrijednost_zalihe", "sum"),
+        stavki_narudzbe=("narudzba", lambda s: int((s > 0).sum())),
+        vrijednost_narudzbe=("vrijednost_narudzbe", "sum"),
+    ).reset_index().sort_values(["vrijednost_narudzbe", "vrijednost_eoq"], ascending=False)
+    return g
+
+
+def narudzba_csv(a: pd.DataFrame) -> pd.DataFrame:
+    """Stavke za naručivanje, spremne za uvoz u ERP: jedan redak po artiklu."""
+    if a["narudzba"].isna().all():
+        return pd.DataFrame(columns=["dobavljac", "sifra", "naziv", "kolicina", "nabavna_cijena", "vrijednost"])
+    n = a[a["narudzba"] > 0].copy()
+    n = n.sort_values(["dobavljac", "vrijednost_narudzbe"], ascending=[True, False])
+    return pd.DataFrame({"dobavljac": n["dobavljac"], "sifra": n["sifra"], "naziv": n["naziv"],
+                         "kolicina": n["narudzba"].astype(int), "nabavna_cijena": n["nabavna"].round(2),
+                         "vrijednost": n["vrijednost_narudzbe"].round(2)})
+
+
+def izvezi_excel(rez: Rezultat, p: Parametri) -> bytes:
+    a = rez.artikli
+    stupci = {
+        "sifra": "Šifra", "naziv": "Naziv", "dobavljac": "Dobavljač", "klasa": "ABC/XYZ",
+        "potraznja_god": "Potražnja god.", "sigma_mj": "σ potražnje (mj.)", "cv": "CV",
+        "lt_dani": "Lead time (dani)", "lt_izvor": "Izvor lead timea", "z": "z",
+        "sigurnosna": "Sigurnosna zaliha", "tocka_naruc": "Točka naručivanja", "eoq": "EOQ",
+        "narudzbi_god": "Narudžbi god.", "trenutna": "Trenutna zaliha", "na_putu": "Na putu", "narudzba": "Za naručiti", "zaliha": "Prosječna zaliha", "obrtaj": "Obrtaj",
+        "dani_zalihe": "Dani zalihe", "vrijednost_zalihe": "Vrijednost zalihe (€)", "status": "Status",
+    }
+    stupci = {k: v for k, v in stupci.items() if k in a}
+    matrica = a[list(stupci)].rename(columns=stupci).copy()
+    for c in ("σ potražnje (mj.)", "CV", "Sigurnosna zaliha", "Točka naručivanja", "Narudžbi god.",
+              "Obrtaj", "Dani zalihe", "Vrijednost zalihe (€)"):
+        matrica[c] = matrica[c].round(2)
+    matrica["Sigurnosna zaliha"] = np.ceil(a["sigurnosna"]).astype(int)
+    matrica["Točka naručivanja"] = np.ceil(a["tocka_naruc"]).astype(int)
+    u = rez.uskladjenost.rename(columns={
+        "polje": "Polje", "artikala": "Artikala", "udio_prodaja": "Udio u prodaji (%)",
+        "udio_zaliha": "Udio u zalihama (%)", "odstupanje": "Odstupanje (p.b.)",
+        "nalaz": "Nalaz", "smjer": "Smjer", "rizik_stockout_A": "Rizik stockouta A"}).round(2)
+    d = po_dobavljacu(a).rename(columns={
+        "dobavljac": "Dobavljač", "artikala": "Artikala", "stavki_narudzbe": "Stavki za naručiti",
+        "vrijednost_narudzbe": "Vrijednost narudžbe (€)", "vrijednost_eoq": "Vrijednost EOQ (€)",
+        "vrijednost_sigurnosnih": "Vrijednost sig. zaliha (€)", "vrijednost_zalihe": "Vrijednost zalihe (€)"}).round(2)
+    par = pd.DataFrame({"Pretpostavke": rez.pretpostavke + [""] + ["Upozorenja:"] + rez.upozorenja})
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as w:
+        narudzba_csv(a).to_excel(w, sheet_name="Narudžba", index=False)
+        matrica.to_excel(w, sheet_name="Matrica zaliha", index=False)
+        u.to_excel(w, sheet_name="Usklađenost", index=False)
+        d.to_excel(w, sheet_name="Po dobavljaču", index=False)
+        par.to_excel(w, sheet_name="Na čemu počiva", index=False)
+        for ws in w.book.worksheets:
+            ws.freeze_panes = "A2"
+            for col in ws.columns:
+                sirina = max(len(str(c.value)) if c.value is not None else 0 for c in col[:200])
+                ws.column_dimensions[col[0].column_letter].width = min(max(10, sirina + 2), 90)
+    return buf.getvalue()
+
+
+def demo_podaci(n: int = 40, seed: int = 7) -> pd.DataFrame:
+    """Izmišljeni, ali realistični podaci za predložak i demonstraciju."""
+    rng = np.random.default_rng(seed)
+    dobavljaci = ["Alfa d.o.o.", "Beta trgovina", "Gama komponente", "Delta uvoz"]
+    redovi = []
+    for i in range(n):
+        baza = float(rng.choice([400, 150, 60, 20, 8], p=[.08, .17, .3, .3, .15]))
+        nestalnost = float(rng.choice([0.15, 0.4, 0.9], p=[.35, .4, .25]))
+        mj = np.clip(rng.normal(baza, baza * nestalnost, 12), 0, None).round()
+        nab = round(float(rng.uniform(2, 60)), 2)
+        pros = float(mj.mean())
+        lt = int(rng.choice([7, 14, 21, 35]))
+        r = {"Šifra": f"ART-{i + 1:03d}", "Naziv": f"Artikl {i + 1}", "Dobavljač": dobavljaci[i % 4],
+             "Nabavna cijena": nab, "Prodajna cijena": round(nab * float(rng.uniform(1.25, 1.7)), 2),
+             "Prosječna zaliha": int(pros * rng.uniform(0.5, 4)),
+             "Trenutna zaliha": int(pros * rng.uniform(0, 3)), "Na putu": int(pros * rng.choice([0, 0, 1])),
+             "Lead time": lt, "MOQ": int(rng.choice([0, 0, 20, 50])), "Pakiranje": int(rng.choice([1, 1, 6, 12]))}
+        for k, v in enumerate(mj, 1):
+            r[f"Mjesec {k}"] = int(v)
+        redovi.append(r)
+    return pd.DataFrame(redovi)
+
+
+def predlozak_excel() -> bytes:
+    buf = io.BytesIO()
+    upute = pd.DataFrame({"Stupac": [
+        "Šifra, Naziv, Dobavljač", "Nabavna cijena, Prodajna cijena", "Prosječna zaliha",
+        "Mjesec 1 … Mjesec 12", "Trenutna zaliha", "Na putu", "Lead time", "MOQ, Pakiranje"],
+        "Obavezno": ["da", "da", "da", "da (točno 12 stupaca)", "ne, ali bez njega nema količine za narudžbu",
+                     "ne, preporučeno", "ne (dani); inače se koristi zadani", "ne"],
+        "Napomena": ["jedan redak po artiklu, bez retka Total", "u EUR, po komadu",
+                     "prosjek zalihe u količini kroz godinu", "količina prodaje po mjesecu, najstariji prvi",
+                     "stanje u skladištu danas, u komadima", "već naručeno, a nije stiglo",
+                     "stvarni rok isporuke", "narudžba se zaokružuje na minimum i višekratnik"]})
+    with pd.ExcelWriter(buf, engine="openpyxl") as w:
+        demo_podaci().to_excel(w, sheet_name="Podaci", index=False)
+        upute.to_excel(w, sheet_name="Upute", index=False)
+        for ws in w.book.worksheets:
+            ws.freeze_panes = "A2"
+            for col in ws.columns:
+                ws.column_dimensions[col[0].column_letter].width = min(max(10, max(len(str(c.value or "")) for c in col[:60]) + 2), 60)
+    return buf.getvalue()
