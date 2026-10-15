@@ -40,9 +40,12 @@ def parametri_iz(src) -> Parametri:
 
 
 def pokreni(file_storage, form):
-    if not file_storage or not file_storage.filename:
-        raise GreskaUnosa("Odaberite datoteku s izvozom.")
-    df = engine.ucitaj(file_storage.read(), file_storage.filename)
+    if form.get("demo") == "1" and not (file_storage and file_storage.filename):
+        df = engine.demo_podaci()
+    elif not file_storage or not file_storage.filename:
+        raise GreskaUnosa("Odaberite datoteku s izvozom ili isprobajte primjer.")
+    else:
+        df = engine.ucitaj(file_storage.read(), file_storage.filename)
     d, upoz = engine.priprema(df)
     p = parametri_iz(form)
     return engine.izracunaj(d, p, upoz), p
@@ -76,28 +79,30 @@ def index():
     return send_from_directory("static", "index.html")
 
 
-@app.route("/api/analiziraj", methods=["POST"])
-def analiziraj():
-    rez, p = pokreni(request.files.get("datoteka"), request.form)
+def odgovor(rez):
     a = rez.artikli
-    po_dob = engine.po_dobavljacu(a)
-    stavke = engine.narudzba_csv(a)
     imamo_narudzbu = bool(a["narudzba"].notna().any())
-    cols = ["sifra", "naziv", "dobavljac", "klasa", "potraznja_god", "sigurnosna", "tocka_naruc", "eoq",
-            "eoq_izvor", "zaliha", "obrtaj", "dani_zalihe", "vrijednost_zalihe", "status", "lt_dani", "lt_izvor"]
+    cols = ["sifra", "naziv", "dobavljac", "abc", "xyz", "klasa", "potraznja_god", "promet", "zaliha",
+            "vrijednost_zalihe", "obrtaj", "dani_zalihe", "sigurnosna", "tocka_naruc", "eoq", "eoq_izvor",
+            "status", "lt_dani", "lt_izvor", "cv"]
     if imamo_narudzbu:
-        cols += ["trenutna", "na_putu", "narudzba", "vrijednost_narudzbe"] if "na_putu" in a else \
-            ["trenutna", "narudzba", "vrijednost_narudzbe"]
-    return jsonify({
+        cols += [c for c in ("trenutna", "na_putu", "narudzba", "vrijednost_narudzbe") if c in a]
+    return {
         "sazetak": j(rez.sazetak),
         "upozorenja": rez.upozorenja,
         "pretpostavke": rez.pretpostavke,
         "uskladjenost": u_zapise(rez.uskladjenost),
-        "dobavljaci": u_zapise(po_dob),
-        "narudzba": u_zapise(stavke),
+        "dobavljaci": u_zapise(engine.po_dobavljacu(a)),
+        "narudzba": u_zapise(engine.narudzba_csv(a)),
         "ima_narudzbu": imamo_narudzbu,
         "artikli": u_zapise(a[[c for c in cols if c in a]].round(2)),
-    })
+    }
+
+
+@app.route("/api/analiziraj", methods=["POST"])
+def analiziraj():
+    rez, _ = pokreni(request.files.get("datoteka"), request.form)
+    return jsonify(odgovor(rez))
 
 
 @app.route("/api/izvoz.xlsx", methods=["POST"])

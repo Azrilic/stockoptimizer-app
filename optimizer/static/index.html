@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StockOptimizer – što naručiti ovaj tjedan</title>
+<title>StockOptimizer – analiza i narudžba</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -15,13 +15,13 @@
 *{box-sizing:border-box}
 html{font-size:16px}
 body{margin:0;background:var(--bg);color:var(--text);font-family:Poppins,system-ui,sans-serif;line-height:1.5}
-.wrap{max-width:1040px;margin:0 auto;padding:32px 16px 80px}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 16px 80px}
 h1,h2{font-family:"Playfair Display",serif;font-style:italic;text-transform:uppercase;letter-spacing:.02em;margin:0}
 h1{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.15}
-h2{font-size:1.2rem;color:var(--accent);margin-bottom:12px}
-.lead{color:var(--muted);margin:10px 0 28px;max-width:640px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
-.drop{border:2px dashed var(--line);border-radius:12px;padding:36px 16px;text-align:center;cursor:pointer;transition:.15s}
+h2{font-size:1.1rem;color:var(--accent);margin-bottom:12px}
+.lead{color:var(--muted);margin:10px 0 24px;max-width:680px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:28px 16px;text-align:center;cursor:pointer;transition:.15s;display:block}
 .drop:hover,.drop.on{border-color:var(--accent);background:var(--panel2)}
 .drop strong{display:block;font-size:1.05rem}
 .drop span{color:var(--muted);font-size:.9rem}
@@ -32,56 +32,80 @@ details summary{cursor:pointer;color:var(--muted);font-size:.92rem;padding:6px 0
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-top:12px}
 label{display:block;font-size:.8rem;color:var(--muted)}
 label small{display:block;font-size:.72rem;color:#7b7b84;margin-top:2px;line-height:1.3}
-input[type=number]{width:100%;margin-top:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:9px 10px;font:inherit}
-input[type=number]:focus,button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input[type=number],input[type=search],select{width:100%;margin-top:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:9px 10px;font:inherit;font-size:.9rem}
+input:focus,select:focus,button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button,.btn{background:var(--accent-d);color:#fff;border:0;border-radius:10px;padding:12px 22px;font:600 .95rem Poppins,sans-serif;cursor:pointer;text-decoration:none;display:inline-block}
 button:hover,.btn:hover{background:var(--accent)}
 button:disabled{opacity:.5;cursor:wait}
-.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-.btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+.ghost{background:transparent!important;border:1px solid var(--line);color:var(--text)}
+.ghost:hover{border-color:var(--accent);color:var(--accent)}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .err{background:#2a1313;border:1px solid var(--bad);color:#ffd2d2;border-radius:10px;padding:12px 14px;margin:14px 0}
-.warn{background:#2a2410;border:1px solid #6d5a16;color:#f3e3a6;border-radius:10px;padding:10px 14px;margin:8px 0;font-size:.88rem}
-.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.warn{background:#2a2410;border:1px solid #6d5a16;color:#f3e3a6;border-radius:10px;padding:8px 14px;margin:6px 0;font-size:.86rem}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 .stat{background:var(--panel2);border-radius:10px;padding:16px}
-.stat b{display:block;font-size:1.9rem;color:var(--accent);line-height:1.1}
+.stat b{display:block;font-size:1.8rem;color:var(--accent);line-height:1.1}
 .stat span{color:var(--muted);font-size:.82rem}
-table{width:100%;border-collapse:collapse;font-size:.88rem}
-th{font-weight:500;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
-td{padding:8px;border-bottom:1px solid #212125;vertical-align:top}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th{font-weight:500;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);white-space:nowrap}
+th.sort{cursor:pointer;user-select:none}
+th.sort:hover{color:var(--text)}
+td{padding:7px 8px;border-bottom:1px solid #212125;vertical-align:top;white-space:nowrap}
 .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 th.n{text-align:right}
-.scroll{overflow-x:auto;max-height:520px}
+.scroll{overflow-x:auto;max-height:560px}
 .sup{border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:var(--panel)}
 .sup>summary{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;color:var(--text);font-weight:500}
 .sup>summary span{color:var(--muted);font-weight:400}
 .sup .scroll{padding:0 14px 12px}
-.tabs{display:flex;gap:6px;margin:30px 0 14px;flex-wrap:wrap}
-.tab{background:transparent;border:1px solid var(--line);color:var(--muted);padding:8px 16px;border-radius:999px;font-size:.88rem}
-.tab[aria-selected=true]{background:var(--accent-d);border-color:var(--accent-d);color:#fff}
-.mx{display:grid;grid-template-columns:auto repeat(3,1fr);gap:6px;font-size:.82rem;max-width:640px}
-.mx div{padding:10px;border-radius:8px;background:var(--panel2);text-align:center}
-.mx .h{background:none;color:var(--muted)}
-.mx .c b{display:block;font-size:.95rem}
-.mx .c.kapital{box-shadow:inset 0 0 0 2px var(--warn)}
-.mx .c.stockout{box-shadow:inset 0 0 0 2px var(--bad)}
-.mx .c.nalaz.kapital{background:#2b2410}
-.mx .c.nalaz.stockout{background:#2b1414}
-.tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.75rem;border:1px solid var(--line)}
+.views{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0 20px}
+.view{background:var(--panel);border:1px solid var(--line);color:var(--muted);text-align:left;padding:14px 18px;border-radius:12px}
+.view b{display:block;color:var(--text);font-size:1rem}
+.view span{font-size:.8rem;font-weight:400}
+.view[aria-pressed=true]{border-color:var(--accent);background:var(--panel2)}
+.view[aria-pressed=true] b{color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{background:transparent;color:var(--muted);border:0;border-radius:0;padding:7px 14px;font-size:.82rem;font-weight:500}
+.seg button[aria-pressed=true]{background:var(--accent-d);color:#fff}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+.ctl{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:flex-end}
+.ctl>div>small{display:block;color:var(--muted);font-size:.72rem;margin-bottom:4px}
+.mxgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:22px 28px}
+@media(max-width:520px){.mxgrid{grid-template-columns:1fr}}
+.mxbox h3{margin:0 0 8px;font-size:.92rem;font-weight:600}
+.mxbox h3 small{color:var(--muted);font-weight:400}
+table.mx{table-layout:fixed;border-collapse:separate;border-spacing:4px;font-size:.82rem}
+table.mx th:first-child{width:28px}
+table.mx th:last-child,table.mx td.tot{width:96px}
+table.mx th{background:none;position:static;text-align:center;padding:4px;border:0}
+table.mx th.rh{cursor:pointer}
+table.mx th.ch{cursor:pointer}
+table.mx th.rh:hover,table.mx th.ch:hover{color:var(--accent)}
+table.mx td{padding:0;border:0}
+table.mx .cell{width:100%;background:var(--panel2);color:var(--text);border-radius:8px;padding:10px 4px;font:500 .82rem Poppins,sans-serif;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.mx .cell:hover{outline:1px solid var(--accent)}
+table.mx .cell.sel{outline:2px solid var(--accent)}
+table.mx td.tot{color:var(--muted);text-align:center;vertical-align:middle;white-space:nowrap;font-size:.78rem;font-variant-numeric:tabular-nums;padding:0 2px}
+table.mx td{vertical-align:middle}
+table.mx .cell.stock{box-shadow:inset 0 0 0 2px var(--bad);background:#2b1414}
+table.mx .cell.cap{box-shadow:inset 0 0 0 2px var(--warn);background:#2b2410}
+table.mx .cell.mild{background:#222226}
+.note{color:var(--muted);font-size:.8rem}
+.chip{display:inline-flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--accent);color:var(--text);border-radius:999px;padding:3px 12px;font-size:.8rem;cursor:pointer}
+.tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.74rem;border:1px solid var(--line);white-space:nowrap}
 .tag.Uredno{color:var(--ok);border-color:var(--ok)}
 .tag.Rizik{color:var(--bad);border-color:var(--bad)}
-.tag.Višak,.tag.Ozbiljan{color:var(--warn);border-color:var(--warn)}
-.tag.Nema{color:var(--warn);border-color:var(--warn)}
+.tag.Višak,.tag.Ozbiljan,.tag.Nema{color:var(--warn);border-color:var(--warn)}
 ul.plain{padding-left:18px;color:var(--muted);font-size:.88rem}
-.hidden{display:none}
+.hidden{display:none!important}
 footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
-@media(max-width:600px){.wrap{padding-top:20px}}
+@media(max-width:600px){.wrap{padding-top:20px}.views{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Što naručiti ovaj tjedan</h1>
-  <p class="lead">Učitajte izvoz iz ERP-a i dobijte količinu za narudžbu po dobavljaču, spremnu za uvoz. Podaci se ne spremaju: obrada traje koliko i vaš zahtjev.</p>
+  <h1>Analiza zaliha i narudžba</h1>
+  <p class="lead">Učitajte izvoz iz ERP-a. Prvo vidite kako su zalihe i prodaja raspoređene po ABC/XYZ matrici, a zatim količine koje treba naručiti. Podaci se ne spremaju.</p>
 
   <form id="forma" class="card" novalidate>
     <label class="drop" id="drop" tabindex="0">
@@ -94,49 +118,86 @@ footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
       <summary>Što dobijete s kojim podacima</summary>
       <ul class="plain">
         <li><b>Šifra + 12 mjeseci prodaje:</b> ABC/XYZ, sigurnosna zaliha, točka naručivanja i količina po narudžbi.</li>
-        <li><b>+ trenutna zaliha:</b> koliko točno naručiti ovaj tjedan (i + <i>na putu</i>, da se ne naruči dvaput).</li>
-        <li><b>+ nabavna cijena:</b> pravi EOQ i vrijednosti u eurima.</li>
-        <li><b>+ dobavljač:</b> narudžba razdvojena po dobavljaču.</li>
-        <li><b>+ prosječna zaliha:</b> obrtaj, status artikla i usporedba zaliha s prodajom.</li>
+        <li><b>+ prosječna zaliha:</b> matrica zaliha, obrtaj, status artikla i usporedba zaliha s prodajom.</li>
+        <li><b>+ nabavna cijena:</b> vrijednosti u eurima i pravi EOQ.</li>
+        <li><b>+ trenutna zaliha (i na putu):</b> koliko točno naručiti ovaj tjedan.</li>
+        <li><b>+ dobavljač:</b> filtriranje i narudžba po dobavljaču.</li>
         <li><b>+ lead time:</b> stvarni rokovi isporuke umjesto zadanih.</li>
       </ul>
     </details>
-
-    <details style="margin-top:14px">
+    <details style="margin-top:6px">
       <summary>Pretpostavke (zadane vrijednosti obično odgovaraju)</summary>
       <div class="grid">
-        <label>Razina usluge A (%)<input type="number" name="razina_a" value="98" min="51" max="99.9" step="1"><small>Artikli koji nose najveći promet.</small></label>
+        <label>Razina usluge A (%)<input type="number" name="razina_a" value="98" min="51" max="99.9" step="1"></label>
         <label>Razina usluge B (%)<input type="number" name="razina_b" value="95" min="51" max="99.9" step="1"></label>
         <label>Razina usluge C (%)<input type="number" name="razina_c" value="90" min="51" max="99.9" step="1"></label>
-        <label>Trošak jedne narudžbe (€)<input type="number" name="trosak_narudzbe" value="60" min="0" step="1"><small>Administracija, prijevoz, zaprimanje – po narudžbi, neovisno o količini.</small></label>
-        <label>Trošak držanja (% godišnje)<input type="number" name="drzanje_postotak" value="20" min="1" step="1"><small>Kapital, prostor, osiguranje, kalo – kao % nabavne cijene.</small></label>
-        <label>Pokrivenost bez nabavne cijene (tjedni)<input type="number" name="pokrivenost_tjedana" value="4" min="1" step="1"><small>Količina po narudžbi kad izvoz nema nabavnu cijenu (EOQ nije moguć).</small></label>
-        <label>Zadani lead time (dani)<input type="number" name="lead_time_default" value="21" min="1" step="1"><small>Koristi se za artikle bez lead timea u izvozu.</small></label>
+        <label>Trošak jedne narudžbe (€)<input type="number" name="trosak_narudzbe" value="60" min="0" step="1"><small>Administracija, prijevoz, zaprimanje – po narudžbi.</small></label>
+        <label>Trošak držanja (% godišnje)<input type="number" name="drzanje_postotak" value="20" min="1" step="1"><small>Kapital, prostor, osiguranje, kalo – % nabavne cijene.</small></label>
+        <label>Pokrivenost bez nabavne cijene (tjedni)<input type="number" name="pokrivenost_tjedana" value="4" min="1" step="1"><small>Količina po narudžbi kad nema nabavne cijene.</small></label>
+        <label>Zadani lead time (dani)<input type="number" name="lead_time_default" value="21" min="1" step="1"><small>Za artikle bez lead timea u izvozu.</small></label>
       </div>
     </details>
-
-    <div class="row" style="margin-top:18px">
-      <button type="submit" id="gumb">Izračunaj narudžbu</button>
-      <span id="stanje" style="color:var(--muted);font-size:.88rem"></span>
+    <div class="row" style="margin-top:16px">
+      <button type="submit" id="gumb">Analiziraj</button>
+      <button type="button" class="ghost" id="gumbDemo">Isprobaj s primjerom</button>
+      <span id="stanje" class="note"></span>
     </div>
     <div id="greska" class="err hidden" role="alert"></div>
   </form>
 
   <div id="rezultat" class="hidden">
-    <section class="card" id="hero"></section>
+    <div class="views" role="group" aria-label="Faza">
+      <button type="button" class="view" id="vAn" aria-pressed="true"><b>1 · Analiza</b><span>Matrice zaliha i prodaje, popis artikala</span></button>
+      <button type="button" class="view" id="vNar" aria-pressed="false"><b>2 · Narudžba</b><span>Količine za naručiti po dobavljaču</span></button>
+    </div>
     <div id="upozorenja"></div>
 
-    <h2 id="nasNarudzba">Narudžba po dobavljaču</h2>
-    <div id="dobavljaci"></div>
+    <!-- ANALIZA -->
+    <div id="analiza">
+      <section class="card" id="nalaz"></section>
 
-    <div class="tabs" role="tablist">
-      <button class="tab" role="tab" aria-selected="true" data-t="t1">Zašto ove količine</button>
-      <button class="tab" role="tab" aria-selected="false" data-t="t2">Svi artikli</button>
-      <button class="tab" role="tab" aria-selected="false" data-t="t3">Na čemu počiva</button>
+      <section class="card">
+        <div class="ctl">
+          <div><small>Mjera</small><div class="seg" id="segMjera">
+            <button type="button" data-v="vrijednost">Vrijednost (€)</button>
+            <button type="button" data-v="kolicina">Količina</button>
+            <button type="button" data-v="broj">Broj artikala</button></div></div>
+          <div><small>Prikaz</small><div class="seg" id="segPrikaz">
+            <button type="button" data-v="abs">Apsolutno</button>
+            <button type="button" data-v="pct">Postotak</button></div></div>
+          <div id="dobWrap"><small>Dobavljač</small><select id="fDob" aria-label="Dobavljač"></select></div>
+          <div style="flex:1;min-width:170px"><small>Pretraži artikl</small><input type="search" id="fQ" placeholder="šifra ili naziv" style="margin:0"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="mxgrid" id="matrice"></div>
+        <p class="note" style="margin:12px 0 0">Kliknite polje (npr. AX) ili slovo retka/stupca da popis ispod prikaže samo te artikle. Odstupanje: <span style="color:var(--bad)">crveno</span> = zalihe manje od prodaje (rizik manjka), <span style="color:var(--warn)">žuto</span> = zalihe veće od prodaje (vezan novac). Pragovi 2 i 5 postotnih bodova; za A artikle i zalihe ispod 80% udjela u prodaji.</p>
+      </section>
+
+      <section class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <div class="row"><h2 style="margin:0">Popis artikala</h2><span id="brojArt" class="note"></span><span id="chips"></span></div>
+          <div class="row"><button type="button" class="ghost btn" id="dlPrikaz" style="padding:8px 16px;font-size:.82rem">Preuzmi prikazano (CSV)</button>
+          <button type="button" class="ghost btn" id="dlXls" style="padding:8px 16px;font-size:.82rem">Cijeli rezultat (Excel)</button></div>
+        </div>
+        <div class="scroll"><table id="tab"></table></div>
+        <div class="row" style="justify-content:space-between;margin-top:10px">
+          <span id="strInfo" class="note"></span>
+          <span class="row"><button type="button" class="ghost btn" id="pPrev" style="padding:6px 14px">‹ Prethodna</button><button type="button" class="ghost btn" id="pNext" style="padding:6px 14px">Sljedeća ›</button></span>
+        </div>
+      </section>
+
+      <details class="card"><summary>Na čemu počiva izračun</summary><ul class="plain" id="pretpostavke"></ul></details>
+      <div class="row"><button type="button" id="naNarudzbu">Dalje: količine za narudžbu →</button></div>
     </div>
-    <section id="t1" class="card"></section>
-    <section id="t2" class="card hidden"></section>
-    <section id="t3" class="card hidden"></section>
+
+    <!-- NARUDŽBA -->
+    <div id="narudzba" class="hidden">
+      <section class="card" id="hero"></section>
+      <div id="dobavljaci"></div>
+      <div class="row" style="margin-top:6px"><button type="button" class="ghost btn" id="natrag">← Natrag na analizu</button></div>
+    </div>
   </div>
 
   <footer>StockOptimizer · Logiko d.o.o. · Ovo je nacrt politike zaliha, ne usvojena politika: razinu usluge, odobravanje odstupanja i vlasništvo nad rokom isporuke određujete vi.</footer>
@@ -148,62 +209,198 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":
 const fmt = (v, d = 0) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("hr-HR", {minimumFractionDigits: d, maximumFractionDigits: d});
 const eur = (v) => v == null ? "–" : fmt(v, 0) + " €";
 
+const S = {d: null, demo: false, mjera: "vrijednost", prikaz: "abs", abc: null, xyz: null, dob: "", q: "", sort: {k: "promet", dir: -1}, page: 0, PER: 100};
 const forma = $("#forma"), inp = $("#datoteka"), drop = $("#drop");
-inp.addEventListener("change", () => { $("#imeDatoteke").textContent = inp.files[0] ? inp.files[0].name : "Povucite izvoz ovdje ili kliknite za odabir"; });
+
+/* ---------- učitavanje ---------- */
+inp.addEventListener("change", () => { S.demo = false; $("#imeDatoteke").textContent = inp.files[0] ? inp.files[0].name : "Povucite izvoz ovdje ili kliknite za odabir"; });
 drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inp.click(); } });
 ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("on"); }));
 ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("on"); }));
 drop.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) { inp.files = e.dataTransfer.files; inp.dispatchEvent(new Event("change")); } });
 
-document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", x === b));
-  ["t1", "t2", "t3"].forEach((id) => $("#" + id).classList.toggle("hidden", id !== b.dataset.t));
-}));
-
 function pokaziGresku(m) { const g = $("#greska"); g.textContent = m; g.classList.toggle("hidden", !m); }
+function podaci() { const fd = new FormData(forma); if (S.demo) { fd.delete("datoteka"); fd.set("demo", "1"); } return fd; }
 
-forma.addEventListener("submit", async (e) => {
-  e.preventDefault(); pokaziGresku("");
-  if (!inp.files[0]) { pokaziGresku("Odaberite datoteku s izvozom."); return; }
-  const gumb = $("#gumb"); gumb.disabled = true; $("#stanje").textContent = "Računam…";
+async function pokreni(demo) {
+  pokaziGresku("");
+  S.demo = demo;
+  if (!demo && !inp.files[0]) { pokaziGresku("Odaberite datoteku s izvozom ili kliknite „Isprobaj s primjerom“."); return; }
+  $("#gumb").disabled = $("#gumbDemo").disabled = true; $("#stanje").textContent = "Računam…";
   try {
-    const r = await fetch("/api/analiziraj", {method: "POST", body: new FormData(forma)});
+    const r = await fetch("/api/analiziraj", {method: "POST", body: podaci()});
     const d = await r.json();
     if (!r.ok) throw new Error(d.greska || "Došlo je do pogreške.");
-    prikazi(d);
+    if (demo) $("#imeDatoteke").textContent = "Primjer s izmišljenim podacima (40 artikala)";
+    start(d);
   } catch (err) { pokaziGresku(err.message); $("#rezultat").classList.add("hidden"); }
-  finally { gumb.disabled = false; $("#stanje").textContent = ""; }
-});
+  finally { $("#gumb").disabled = $("#gumbDemo").disabled = false; $("#stanje").textContent = ""; }
+}
+forma.addEventListener("submit", (e) => { e.preventDefault(); pokreni(false); });
+$("#gumbDemo").addEventListener("click", () => pokreni(true));
 
 async function preuzmi(url, ime) {
-  const r = await fetch(url, {method: "POST", body: new FormData(forma)});
+  const r = await fetch(url, {method: "POST", body: podaci()});
   if (!r.ok) { pokaziGresku((await r.json()).greska || "Preuzimanje nije uspjelo."); return; }
-  const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = ime; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  skini(await r.blob(), ime);
+}
+function skini(blob, ime) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = ime; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+
+/* ---------- faze ---------- */
+function pogled(v) {
+  $("#analiza").classList.toggle("hidden", v !== "an"); $("#narudzba").classList.toggle("hidden", v !== "nar");
+  $("#vAn").setAttribute("aria-pressed", v === "an"); $("#vNar").setAttribute("aria-pressed", v === "nar");
+  $("#vAn").scrollIntoView({behavior: "smooth", block: "start"});
+}
+$("#vAn").onclick = $("#natrag").onclick = () => pogled("an");
+$("#vNar").onclick = $("#naNarudzbu").onclick = () => pogled("nar");
+
+function start(d) {
+  S.d = d; S.abc = S.xyz = null; S.dob = ""; S.q = ""; S.page = 0;
+  const s = d.sazetak;
+  S.mjera = s.ima_cijene ? "vrijednost" : "kolicina";
+  $("#rezultat").classList.remove("hidden");
+  $("#fQ").value = "";
+  const dobs = [...new Set(d.artikli.map((a) => a.dobavljac))].sort();
+  const imaDob = dobs.length > 1 || (dobs.length === 1 && dobs[0] !== "(svi artikli)");
+  $("#dobWrap").classList.toggle("hidden", !imaDob);
+  $("#fDob").innerHTML = `<option value="">Svi (${dobs.length})</option>` + dobs.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  $("#upozorenja").innerHTML = d.upozorenja.length ? `<details class="card" style="padding:8px 14px"><summary>Napomene o podacima (${d.upozorenja.length})</summary>${d.upozorenja.map((u) => `<div class="warn">${esc(u)}</div>`).join("")}</details>` : "";
+  $("#pretpostavke").innerHTML = d.pretpostavke.map((p) => `<li>${esc(p)}</li>`).join("");
+  $("#nalaz").innerHTML = `<div class="hero">
+      <div class="stat"><b>${fmt(s.broj_artikala)}</b><span>artikala u analizi</span></div>
+      ${s.obrtaj ? `<div class="stat"><b>${fmt(s.obrtaj, 1)}×</b><span>obrtaj zaliha godišnje (${fmt(s.dani_zalihe)} dana)</span></div>` : ""}
+      ${s.vrijednost_zaliha != null ? `<div class="stat"><b>${eur(s.vrijednost_zaliha)}</b><span>vrijednost zaliha</span></div>` : ""}
+      ${s.vrijednost_visak != null ? `<div class="stat"><b>${eur(s.vrijednost_visak)}</b><span>zalihe u višku ili bez prodaje</span></div>` : ""}
+    </div>
+    <p style="margin:14px 0 0">${s.recenice.map(esc).join(" ")}</p>
+    <p class="note" style="margin:6px 0 0">ABC osnova: ${esc(s.abc_osnova)}.</p>`;
+  narudzbaView(d);
+  render();
+  pogled("an");
 }
 
-function prikazi(d) {
-  const s = d.sazetak;
-  $("#rezultat").classList.remove("hidden");
-  const ima$ = s.ima_cijene;
+/* ---------- filtri i izvedeni podaci ---------- */
+function osnovni() {
+  const q = S.q.trim().toLowerCase();
+  return S.d.artikli.filter((a) => (!S.dob || a.dobavljac === S.dob) && (!q || String(a.sifra).toLowerCase().includes(q) || String(a.naziv).toLowerCase().includes(q)));
+}
+function prikazani(base) { return base.filter((a) => (!S.abc || a.abc === S.abc) && (!S.xyz || a.xyz === S.xyz)); }
+
+function render() { const base = osnovni(); matrice(base); tablica(prikazani(base)); }
+
+/* ---------- matrice ---------- */
+const MJERE = {
+  vrijednost: {zal: (a) => a.vrijednost_zalihe || 0, prod: (a) => a.promet || 0, f: (v) => fmt(v, 0) + " €"},
+  kolicina: {zal: (a) => a.zaliha || 0, prod: (a) => a.potraznja_god || 0, f: (v) => fmt(v, 0)},
+  broj: {zal: () => 1, prod: () => 1, f: (v) => fmt(v, 0)},
+};
+function agreg(rows, fn) {
+  const m = {A: {X: 0, Y: 0, Z: 0}, B: {X: 0, Y: 0, Z: 0}, C: {X: 0, Y: 0, Z: 0}};
+  rows.forEach((r) => { if (m[r.abc]) m[r.abc][r.xyz] += fn(r); });
+  return m;
+}
+const zbroj = (m) => "ABC".split("").reduce((t, a) => t + "XYZ".split("").reduce((u, x) => u + m[a][x], 0), 0);
+
+function tabMatrica(naslov, pod, m, fCell, klasa) {
+  const T = zbroj(m);
+  const redUk = (a) => "XYZ".split("").reduce((t, x) => t + m[a][x], 0);
+  const stUk = (x) => "ABC".split("").reduce((t, a) => t + m[a][x], 0);
+  let h = `<div class="mxbox"><h3>${naslov} <small>${pod}</small></h3><table class="mx"><thead><tr><th></th>${"XYZ".split("").map((x) => `<th class="ch" data-x="${x}" title="Filtriraj stupac ${x}">${x}</th>`).join("")}<th>Σ</th></tr></thead><tbody>`;
+  for (const a of "ABC") {
+    h += `<tr><th class="rh" data-a="${a}" title="Filtriraj redak ${a}">${a}</th>`;
+    for (const x of "XYZ") {
+      const k = klasa ? klasa(a, x, m[a][x], T) : "";
+      const sel = S.abc === a && S.xyz === x ? " sel" : "";
+      const sh = T ? m[a][x] / T : 0;
+      const bg = !klasa ? `style="background:rgba(255,138,61,${(Math.min(sh, 1) * .6).toFixed(2)})"` : "";
+      h += `<td><button type="button" class="cell ${k}${sel}" data-a="${a}" data-x="${x}" ${bg}>${fCell(m[a][x], T)}</button></td>`;
+    }
+    h += `<td class="tot">${fCell(redUk(a), T)}</td></tr>`;
+  }
+  h += `<tr><th>Σ</th>${"XYZ".split("").map((x) => `<td class="tot">${fCell(stUk(x), T)}</td>`).join("")}<td class="tot"><b>${fCell(T, T)}</b></td></tr></tbody></table></div>`;
+  return h;
+}
+
+function matrice(base) {
+  const s = S.d.sazetak, M = MJERE[S.mjera];
+  const imaZal = s.ima_zalihu && (S.mjera !== "vrijednost" || s.ima_cijene);
+  const pct = S.prikaz === "pct";
+  const fC = (v, T) => pct ? (T ? fmt(v / T * 100, 1) + "%" : "–") : M.f(v);
+  const zal = agreg(base, M.zal), pro = agreg(base, M.prod);
+  const mjeraNaziv = {vrijednost: "vrijednost u €", kolicina: "količina", broj: "broj artikala"}[S.mjera];
+  let h = imaZal ? tabMatrica("Zalihe", mjeraNaziv, zal, fC) : `<div class="mxbox"><h3>Zalihe</h3><p class="note">Za matricu zaliha izvoz treba stupac <b>Prosječna zaliha</b> (ili Trenutna zaliha)${S.mjera === "vrijednost" && !s.ima_cijene ? " i nabavnu cijenu za prikaz u eurima" : ""}.</p></div>`;
+  h += tabMatrica("Prodaja", (S.mjera === "vrijednost" ? "promet u € (godišnje)" : S.mjera === "kolicina" ? "količina (godišnje)" : "broj artikala"), pro, fC);
+  if (imaZal && S.mjera !== "broj") {
+    const Tz = zbroj(zal), Tp = zbroj(pro);
+    const dev = {A: {}, B: {}, C: {}}, up = {A: {}, B: {}, C: {}};
+    for (const a of "ABC") for (const x of "XYZ") { const z = Tz ? zal[a][x] / Tz * 100 : 0, p = Tp ? pro[a][x] / Tp * 100 : 0; dev[a][x] = z - p; up[a][x] = [z, p]; }
+    const kl = (a, x, v) => { const [z, p] = up[a][x]; if (a === "A" && p > 0 && z < .8 * p) return "stock"; return v <= -5 ? "stock" : v >= 5 ? "cap" : v <= -2 || v >= 2 ? "mild" : ""; };
+    h += tabMatrica("Odstupanje", "zalihe − prodaja, postotni bodovi", dev, (v) => (v > 0 ? "+" : "") + fmt(v, 1), kl);
+  }
+  $("#matrice").innerHTML = h;
+  $("#matrice").querySelectorAll(".cell").forEach((b) => b.onclick = () => { const a = b.dataset.a, x = b.dataset.x; if (S.abc === a && S.xyz === x) S.abc = S.xyz = null; else { S.abc = a; S.xyz = x; } S.page = 0; render(); });
+  $("#matrice").querySelectorAll("th.rh").forEach((t) => t.onclick = () => { S.abc = S.abc === t.dataset.a && !S.xyz ? null : t.dataset.a; S.xyz = null; S.page = 0; render(); });
+  $("#matrice").querySelectorAll("th.ch").forEach((t) => t.onclick = () => { S.xyz = S.xyz === t.dataset.x && !S.abc ? null : t.dataset.x; S.abc = null; S.page = 0; render(); });
+  document.querySelectorAll("#segMjera button").forEach((b) => { b.setAttribute("aria-pressed", b.dataset.v === S.mjera); if (b.dataset.v === "vrijednost") b.disabled = !s.ima_cijene; });
+  document.querySelectorAll("#segPrikaz button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === S.prikaz));
+}
+document.querySelectorAll("#segMjera button").forEach((b) => b.onclick = () => { S.mjera = b.dataset.v; render(); });
+document.querySelectorAll("#segPrikaz button").forEach((b) => b.onclick = () => { S.prikaz = b.dataset.v; render(); });
+$("#fDob").onchange = (e) => { S.dob = e.target.value; S.page = 0; render(); };
+let tq; $("#fQ").oninput = (e) => { clearTimeout(tq); tq = setTimeout(() => { S.q = e.target.value; S.page = 0; render(); }, 180); };
+
+/* ---------- popis artikala ---------- */
+const STUPCI = [
+  {k: "sifra", t: "Šifra"}, {k: "naziv", t: "Naziv"}, {k: "dobavljac", t: "Dobavljač"}, {k: "klasa", t: "Klasa"},
+  {k: "potraznja_god", t: "Prodaja god.", n: 1}, {k: "promet", t: "Promet", n: 1, d: 0},
+  {k: "zaliha", t: "Prosj. zaliha", n: 1}, {k: "vrijednost_zalihe", t: "Vrijed. zalihe €", n: 1},
+  {k: "obrtaj", t: "Obrtaj", n: 1, d: 1}, {k: "dani_zalihe", t: "Dani zalihe", n: 1},
+  {k: "sigurnosna", t: "Sig. zaliha", n: 1, c: 1}, {k: "tocka_naruc", t: "Točka nar.", n: 1, c: 1},
+  {k: "eoq", t: "Kol. po narudžbi", n: 1}, {k: "trenutna", t: "Trenutna", n: 1}, {k: "narudzba", t: "Za naručiti", n: 1, b: 1}, {k: "status", t: "Status"},
+];
+function tablica(rows) {
+  const a0 = S.d.artikli;
+  const st = STUPCI.filter((c) => a0.some((r) => r[c.k] != null) && !(c.k === "dobavljac" && a0.every((r) => r.dobavljac === "(svi artikli)")));
+  const {k, dir} = S.sort;
+  const sorted = rows.slice().sort((a, b) => { const x = a[k], y = b[k]; if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "hr")) * dir; });
+  const pages = Math.max(1, Math.ceil(sorted.length / S.PER)); S.page = Math.min(S.page, pages - 1);
+  const pg = sorted.slice(S.page * S.PER, (S.page + 1) * S.PER);
+  S.vidljivi = {st, sorted};
+  const cell = (r, c) => { const v = r[c.k]; if (c.k === "status") return `<span class="tag ${esc(String(v).split(" ")[0])}">${esc(v)}</span>`; if (c.n) { const x = c.c ? Math.ceil(v) : v; return c.b ? `<b>${fmt(x, c.d ?? (Number.isInteger(x) ? 0 : 1))}</b>` : fmt(x, c.d ?? (Number.isInteger(x) ? 0 : 1)); } return esc(v); };
+  $("#tab").innerHTML = `<thead><tr>${st.map((c) => `<th class="sort ${c.n ? "n" : ""}" data-k="${c.k}">${c.t}${k === c.k ? (dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead><tbody>${pg.map((r) => `<tr>${st.map((c) => `<td class="${c.n ? "n" : ""}">${cell(r, c)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${st.length}" class="note">Nema artikala za ovaj filtar.</td></tr>`}</tbody>`;
+  $("#tab").querySelectorAll("th.sort").forEach((t) => t.onclick = () => { S.sort = {k: t.dataset.k, dir: S.sort.k === t.dataset.k ? -S.sort.dir : (STUPCI.find((c) => c.k === t.dataset.k).n ? -1 : 1)}; S.page = 0; render(); });
+  $("#brojArt").textContent = `${fmt(sorted.length)} od ${fmt(S.d.artikli.length)} artikala`;
+  $("#strInfo").textContent = sorted.length ? `Prikazano ${fmt(S.page * S.PER + 1)}–${fmt(S.page * S.PER + pg.length)} · stranica ${S.page + 1}/${pages}` : "";
+  $("#pPrev").disabled = S.page === 0; $("#pNext").disabled = S.page >= pages - 1;
+  const f = S.abc && S.xyz ? S.abc + S.xyz : S.abc ? "ABC: " + S.abc : S.xyz ? "XYZ: " + S.xyz : "";
+  $("#chips").innerHTML = f ? `<span class="chip" id="chip" role="button" tabindex="0">Filtar: ${esc(f)} ✕</span>` : "";
+  if ($("#chip")) $("#chip").onclick = () => { S.abc = S.xyz = null; S.page = 0; render(); };
+}
+$("#pPrev").onclick = () => { S.page--; render(); };
+$("#pNext").onclick = () => { S.page++; render(); };
+$("#dlPrikaz").onclick = () => {
+  const {st, sorted} = S.vidljivi;
+  const csv = [st.map((c) => c.t).join(";")].concat(sorted.map((r) => st.map((c) => { const v = r[c.k]; return v == null ? "" : typeof v === "number" ? String(v).replace(".", ",") : `"${String(v).replace(/"/g, '""')}"`; }).join(";"))).join("\n");
+  skini(new Blob(["﻿" + csv], {type: "text/csv"}), "artikli.csv");
+};
+$("#dlXls").onclick = () => preuzmi("/api/izvoz.xlsx", "stockoptimizer-rezultat.xlsx");
+
+/* ---------- narudžba ---------- */
+function narudzbaView(d) {
+  const s = d.sazetak, ima$ = s.ima_cijene;
+  const poDob = {}; d.narudzba.forEach((n) => (poDob[n.dobavljac] ||= []).push(n));
+  const ul = d.dobavljaci.filter((x) => x.stavki_narudzbe > 0);
+  const jedan = d.dobavljaci.length === 1 && d.dobavljaci[0].dobavljac === "(svi artikli)";
   $("#hero").innerHTML = (d.ima_narudzbu
     ? `<div class="hero">
         <div class="stat"><b>${fmt(s.narudzba_stavki)}</b><span>artikala za naručiti</span></div>
         ${ima$ ? `<div class="stat"><b>${eur(s.narudzba_vrijednost)}</b><span>vrijednost narudžbe</span></div>` : ""}
-        <div class="stat"><b>${d.dobavljaci.filter((x) => x.stavki_narudzbe > 0).length}</b><span>${d.dobavljaci.length === 1 && d.dobavljaci[0].dobavljac === "(svi artikli)" ? "narudžba" : "dobavljača"}</span></div>
+        <div class="stat"><b>${ul.length}</b><span>${jedan ? "narudžba" : "dobavljača"}</span></div>
       </div>`
-    : `<p style="margin:0">Izvoz nema stupac <b>Trenutna zaliha</b>, pa ne mogu odrediti što treba naručiti ovaj tjedan. Za svaki artikl ipak dobivate sigurnosnu zalihu, točku naručivanja i količinu po narudžbi (kartica <i>Svi artikli</i>). Dodajte trenutnu zalihu i izračunajte ponovno.</p>`) +
-    `<div class="row" style="margin-top:16px">
-      ${d.ima_narudzbu ? '<button type="button" id="dlCsv">Preuzmi narudžbu (CSV za ERP)</button>' : ""}
-      <button type="button" class="${d.ima_narudzbu ? "ghost " : ""}btn" id="dlXls">Preuzmi cijeli rezultat (Excel)</button>
-    </div>`;
+    : `<p style="margin:0">Izvoz nema stupac <b>Trenutna zaliha</b>, pa ne mogu odrediti što treba naručiti ovaj tjedan. Za svaki artikl ipak imate sigurnosnu zalihu, točku naručivanja i količinu po narudžbi u popisu artikala. Dodajte trenutnu zalihu i analizirajte ponovno.</p>`) +
+    (d.ima_narudzbu ? `<div class="row" style="margin-top:16px"><button type="button" id="dlCsv">Preuzmi narudžbu (CSV za ERP)</button></div>` : "");
   if ($("#dlCsv")) $("#dlCsv").onclick = () => preuzmi("/api/narudzba.csv", "narudzba.csv");
-  $("#dlXls").onclick = () => preuzmi("/api/izvoz.xlsx", "stockoptimizer-rezultat.xlsx");
-  $("#upozorenja").innerHTML = d.upozorenja.map((u) => `<div class="warn">${esc(u)}</div>`).join("");
-
-  const poDob = {}; d.narudzba.forEach((n) => (poDob[n.dobavljac] ||= []).push(n));
-  const ul = d.dobavljaci.filter((x) => x.stavki_narudzbe > 0);
-  $("#nasNarudzba").classList.toggle("hidden", !d.ima_narudzbu);
   $("#dobavljaci").innerHTML = d.ima_narudzbu ? (ul.length ? ul.map((x, i) => `
     <details class="sup" ${i === 0 ? "open" : ""}>
       <summary>${esc(x.dobavljac)} <span>${x.stavki_narudzbe} stavki${ima$ ? " · " + eur(x.vrijednost_narudzbe) : ""}</span></summary>
@@ -212,34 +409,6 @@ function prikazi(d) {
         <tbody>${(poDob[x.dobavljac] || []).map((n) => `<tr><td>${esc(n.sifra)}</td><td>${esc(n.naziv)}</td><td class="n"><b>${fmt(n.kolicina)}</b></td>${ima$ ? `<td class="n">${fmt(n.nabavna_cijena, 2)}</td><td class="n">${fmt(n.vrijednost, 2)}</td>` : ""}</tr>`).join("")}</tbody>
       </table></div>
     </details>`).join("") : `<div class="card">Nijedan artikl trenutno nije na ili ispod točke naručivanja. Ništa se ne naručuje.</div>`) : "";
-
-  // Zašto
-  const polja = {}; d.uskladjenost.forEach((u) => (polja[u.polje] = u));
-  let mx = ""; if (d.uskladjenost.length) mx = '<div class="h"></div><div class="h">X (stabilna)</div><div class="h">Y (promjenjiva)</div><div class="h">Z (nepravilna)</div>';
-  if (d.uskladjenost.length) for (const a of "ABC") { mx += `<div class="h">${a}</div>`; for (const x of "XYZ") { const u = polja[a + x];
-    mx += `<div class="c ${u.nalaz === "uredno" ? "" : "nalaz"} ${u.smjer === "ok" ? "" : u.smjer}"><b>${esc(a + x)}</b>prodaja ${fmt(u.udio_prodaja, 1)}%<br>zalihe ${fmt(u.udio_zaliha, 1)}%<br>${u.odstupanje > 0 ? "+" : ""}${fmt(u.odstupanje, 1)} p.b.</div>`; } }
-  const stat = (v, txt) => v == null ? "" : `<div class="stat"><b>${v}</b><span>${txt}</span></div>`;
-  const matrica = d.uskladjenost.length ? `<div class="mx">${mx}</div>
-    <p style="color:var(--muted);font-size:.82rem">Zdravo je kad se udio u zalihama poklapa s udjelom u prodaji. Crveni okvir: rizik manjka na artiklima koji nose prihod. Žuti okvir: novac zarobljen u zalihama koje malo zarađuju. Pragovi: 2 p.b. vrijedi spomenuti, 5 p.b. je nalaz; za A artikle i zalihe ispod 80% udjela u prodaji.</p>` : "";
-  $("#t1").innerHTML = `<h2>Struktura zaliha naspram prodaje</h2>
-    <p style="margin-top:0">${s.recenice.map(esc).join(" ")}</p>
-    ${matrica}
-    <div class="hero">
-      ${stat(s.obrtaj ? fmt(s.obrtaj, 1) + "×" : null, "obrtaj zaliha godišnje")}
-      ${stat(s.dani_zalihe ? fmt(s.dani_zalihe) : null, "dana zalihe")}
-      ${stat(s.vrijednost_visak != null ? eur(s.vrijednost_visak) : null, "zalihe u višku ili bez prodaje")}
-      ${stat(s.vrijednost_sigurnosnih != null ? eur(s.vrijednost_sigurnosnih) : null, "vrijednost sigurnosnih zaliha")}
-      ${stat(fmt(s.broj_artikala), "artikala u analizi")}
-    </div>
-    <p style="color:var(--muted);font-size:.82rem">ABC osnova: ${esc(s.abc_osnova)}.</p>`;
-
-  // Artikli
-  const imaN = d.ima_narudzbu;
-  $("#t2").innerHTML = `<div class="scroll"><table><thead><tr><th>Šifra</th><th>Naziv</th><th>Klasa</th><th class="n">Potraž. god.</th><th class="n">Sig. zaliha</th><th class="n">Točka nar.</th><th class="n">Kol. po narudžbi</th>${imaN ? '<th class="n">Trenutna</th><th class="n">Za naručiti</th>' : ""}<th class="n">Prosj. zaliha</th><th>Status</th></tr></thead><tbody>${
-    d.artikli.map((a) => `<tr><td>${esc(a.sifra)}</td><td>${esc(a.naziv)}</td><td>${esc(a.klasa)}</td><td class="n">${fmt(a.potraznja_god)}</td><td class="n">${fmt(Math.ceil(a.sigurnosna))}</td><td class="n">${fmt(Math.ceil(a.tocka_naruc))}</td><td class="n">${fmt(a.eoq)}</td>${imaN ? `<td class="n">${fmt(a.trenutna)}</td><td class="n"><b>${fmt(a.narudzba)}</b></td>` : ""}<td class="n">${fmt(a.zaliha)}</td><td><span class="tag ${esc(String(a.status).split(" ")[0])}">${esc(a.status)}</span></td></tr>`).join("")}</tbody></table></div>`;
-
-  $("#t3").innerHTML = `<h2>Na čemu počiva</h2><ul class="plain">${d.pretpostavke.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`;
-  $("#rezultat").scrollIntoView({behavior: "smooth", block: "start"});
 }
 </script>
 </body>

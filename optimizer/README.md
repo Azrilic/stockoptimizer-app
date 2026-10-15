@@ -1,7 +1,13 @@
 # StockOptimizer – što naručiti ovaj tjedan
 
-Aplikacija iz izvoza iz ERP-a računa **količinu za narudžbu po dobavljaču**, a uz nju ABC/XYZ analizu,
-sigurnosne zalihe, točke naručivanja, EOQ i obrtaj. Podaci se ne spremaju.
+Aplikacija iz izvoza iz ERP-a radi u dvije faze. Podaci se ne spremaju.
+
+1. **Analiza:** popis svih artikala (sortiranje, filtri po ABC/XYZ, dobavljaču i tekstu) i tri ABC/XYZ matrice: zalihe,
+   prodaja i odstupanje između njih. Mjera: vrijednost (€), količina ili broj artikala; prikaz: apsolutno ili postotak.
+   Klik na polje matrice (npr. AX) filtrira popis. Uz to sigurnosna zaliha, točka naručivanja, obrtaj i status.
+2. **Narudžba (izvršenje):** količine za naručiti po dobavljaču, CSV spreman za uvoz u ERP.
+
+Gumb "Isprobaj s primjerom" pokreće analizu na izmišljenim podacima, bez učitavanja datoteke.
 
 ## Izračun
 
