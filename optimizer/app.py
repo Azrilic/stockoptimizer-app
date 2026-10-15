@@ -99,6 +99,11 @@ def odgovor(rez):
     }
 
 
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
+
+
 @app.route("/api/analiziraj", methods=["POST"])
 def analiziraj():
     rez, _ = pokreni(request.files.get("datoteka"), request.form)

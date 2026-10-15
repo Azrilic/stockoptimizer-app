@@ -102,6 +102,7 @@ table.mx .cell.mild{background:#222226}
 .tag.Višak,.tag.Ozbiljan,.tag.Nema{color:var(--warn);border-color:var(--warn)}
 ul.plain{padding-left:18px;color:var(--muted);font-size:.88rem}
 .hidden{display:none!important}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:min(560px,calc(100vw - 32px));background:var(--panel2);border:1px solid var(--accent);color:var(--text);padding:12px 18px;border-radius:12px;font-size:.88rem;box-shadow:0 8px 30px rgba(0,0,0,.5);z-index:50}
 footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
 @media(max-width:600px){.wrap{padding-top:20px}.views{grid-template-columns:1fr}}
 </style>
@@ -211,6 +212,7 @@ footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
     </div>
   </div>
 
+  <div id="toast" class="hidden" role="status" aria-live="polite"></div>
   <footer>StockOptimizer · Logiko d.o.o. · Ovo je nacrt politike zaliha, ne usvojena politika: razinu usluge, odobravanje odstupanja i vlasništvo nad rokom isporuke određujete vi.</footer>
 </div>
 
@@ -230,6 +232,7 @@ drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " "
 ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("on"); }));
 drop.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) { inp.files = e.dataTransfer.files; inp.dispatchEvent(new Event("change")); } });
 
+function poruka(t) { const el = $("#toast"); el.textContent = t || ""; el.classList.toggle("hidden", !t); }
 function pokaziGresku(m) { const g = $("#greska"); g.textContent = m; g.classList.toggle("hidden", !m); }
 function podaci() { const fd = new FormData(forma); if (S.demo) { fd.delete("datoteka"); fd.set("demo", "1"); } return fd; }
 
@@ -237,7 +240,8 @@ async function pokreni(demo) {
   pokaziGresku("");
   S.demo = demo;
   if (!demo && !inp.files[0]) { pokaziGresku("Odaberite datoteku s izvozom ili kliknite „Isprobaj s primjerom“."); return; }
-  $("#gumb").disabled = $("#gumbDemo").disabled = true; $("#stanje").textContent = "Računam…";
+  $("#gumb").disabled = $("#gumbDemo").disabled = true; poruka("Računam…");
+  const spor = setTimeout(() => poruka("Poslužitelj se budi nakon stanke, to traje do minutu. Pripremamo analizu, hvala na strpljenju…"), 4000);
   try {
     const r = await fetch("/api/analiziraj", {method: "POST", body: podaci()});
     const d = await r.json();
@@ -245,13 +249,16 @@ async function pokreni(demo) {
     if (demo) $("#imeDatoteke").textContent = "Primjer s izmišljenim podacima (40 artikala)";
     start(d);
   } catch (err) { pokaziGresku(err.message); $("#rezultat").classList.add("hidden"); }
-  finally { $("#gumb").disabled = $("#gumbDemo").disabled = false; $("#stanje").textContent = ""; }
+  finally { clearTimeout(spor); $("#gumb").disabled = $("#gumbDemo").disabled = false; poruka(""); }
 }
 forma.addEventListener("submit", (e) => { e.preventDefault(); pokreni(false); });
 $("#gumbDemo").addEventListener("click", () => pokreni(true));
 
 async function preuzmi(url, ime) {
-  const r = await fetch(url, {method: "POST", body: podaci()});
+  poruka("Pripremam datoteku…");
+  const spor = setTimeout(() => poruka("Poslužitelj se budi nakon stanke, to traje do minutu…"), 4000);
+  let r;
+  try { r = await fetch(url, {method: "POST", body: podaci()}); } finally { clearTimeout(spor); poruka(""); }
   if (!r.ok) { pokaziGresku((await r.json()).greska || "Preuzimanje nije uspjelo."); return; }
   skini(await r.blob(), ime);
 }
@@ -421,6 +428,8 @@ function narudzbaView(d) {
       </table></div>
     </details>`).join("") : `<div class="card">Nijedan artikl trenutno nije na ili ispod točke naručivanja. Ništa se ne naručuje.</div>`) : "";
 }
+/* dok je stranica otvorena i vidljiva, javi poslužitelju svakih 10 min da ne zaspi usred rada */
+setInterval(() => { if (!document.hidden) fetch("/health").catch(() => {}); }, 10 * 60 * 1000);
 </script>
 </body>
 </html>
