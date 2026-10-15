@@ -101,7 +101,10 @@ def odgovor(rez):
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    r = jsonify({"status": "ok"})
+    r.headers["Access-Control-Allow-Origin"] = "*"  # odredišna stranica na logiko.hr budi servis prije preusmjeravanja
+    r.headers["Cache-Control"] = "no-store"
+    return r
 
 
 @app.route("/api/analiziraj", methods=["POST"])

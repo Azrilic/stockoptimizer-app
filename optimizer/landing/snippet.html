@@ -1,0 +1,128 @@
+<!-- StockOptimizer odredišna stranica. Zalijepite u WordPress blok "Prilagođeni HTML" (ili stavite u GHL stranicu).
+     Jedino što treba podesiti: APP_URL na dnu (adresa vašeg servisa na Renderu). -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+#sco{--bg:#0b0b0c;--panel:#151517;--panel2:#1d1d20;--line:#2b2b30;--text:#f2f2f3;--muted:#a2a2aa;--accent:#ff8a3d;--accent-d:#e55a00;
+  background:var(--bg);color:var(--text);font-family:Poppins,system-ui,sans-serif;line-height:1.6;font-size:16px;padding:0 16px}
+#sco *{box-sizing:border-box}
+#sco .w{max-width:960px;margin:0 auto;padding:64px 0}
+#sco .eyebrow{color:var(--accent);font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;margin:0 0 14px}
+#sco h1,#sco h2{font-family:"Playfair Display",serif;font-style:italic;text-transform:uppercase;letter-spacing:.02em;margin:0;color:var(--text);line-height:1.15}
+#sco h1{font-size:clamp(1.9rem,5vw,3rem)}
+#sco h2{font-size:clamp(1.25rem,3vw,1.6rem);color:var(--accent);margin-bottom:22px}
+#sco p{margin:0 0 14px}
+#sco .lead{color:var(--muted);font-size:1.08rem;max-width:680px;margin:18px 0 28px}
+#sco .btn{display:inline-block;background:var(--accent-d);color:#fff;border:0;border-radius:10px;padding:15px 30px;font:600 1.05rem Poppins,sans-serif;cursor:pointer;text-decoration:none}
+#sco .btn:hover{background:var(--accent)}
+#sco .btn[disabled]{opacity:.55;cursor:wait}
+#sco .btn:focus-visible,#sco a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+#sco .status{color:var(--muted);font-size:.9rem;margin-top:12px;min-height:1.4em}
+#sco .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+#sco .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px}
+#sco .card h3{margin:0 0 8px;font-size:1.05rem;color:var(--text)}
+#sco .card p{color:var(--muted);font-size:.95rem;margin:0}
+#sco .steps{counter-reset:s;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;list-style:none;padding:0;margin:0}
+#sco .steps li{counter-increment:s;background:var(--panel2);border-radius:12px;padding:20px 20px 20px 64px;position:relative;color:var(--muted);font-size:.95rem}
+#sco .steps li::before{content:counter(s);position:absolute;left:20px;top:16px;font-family:"Playfair Display",serif;font-style:italic;font-size:2rem;color:var(--accent);line-height:1}
+#sco .steps b{display:block;color:var(--text);margin-bottom:2px}
+#sco .sec{border-top:1px solid var(--line)}
+#sco .note{background:var(--panel);border-left:3px solid var(--accent);border-radius:0 12px 12px 0;padding:20px 22px;color:var(--muted)}
+#sco .note b{color:var(--text)}
+#sco .who{color:var(--muted);font-size:.9rem}
+#sco a.l{color:var(--accent)}
+#sco .hid{display:none}
+</style>
+
+<div id="sco">
+  <div class="w">
+    <p class="eyebrow">Za proizvodne, distributerske i trgovačke kompanije iz ex-Yu regije</p>
+    <h1>Gdje vam stoji novac u zalihama i koliko čega naručiti</h1>
+    <p class="lead">Iz jedne tablice s prodajom zadnjih 12 mjeseci dobijete pregled kako su zalihe raspoređene naspram prodaje, sigurnosnu zalihu po artiklu i popis što naručiti po dobavljaču. Bez novog softvera i bez registracije.</p>
+    <button type="button" class="btn" id="sco-gumb">Otvori alat</button>
+    <div class="status" id="sco-status" role="status" aria-live="polite">Prvo otvaranje nakon duže stanke može potrajati do minutu, jer alat prije toga pripremamo.</div>
+  </div>
+
+  <div class="w sec">
+    <h2>Što dobijete</h2>
+    <div class="cards">
+      <div class="card"><h3>Gdje vam stoji novac</h3><p>ABC/XYZ matrica zaliha uz usporedbu s prodajom, po vrijednosti, količini ili broju artikala, u apsolutnim brojevima i u postocima. Klikom na polje (npr. AX) vidite sve artikle u njemu.</p></div>
+      <div class="card"><h3>Koliko držati kao rezervu</h3><p>Sigurnosna zaliha i točka ponovnog naručivanja za svaki artikl, izračunati iz vlastite prodaje, a ne iz osjećaja.</p></div>
+      <div class="card"><h3>Koliko naručiti</h3><p>Količina po narudžbi (EOQ) i popis što naručiti ovaj tjedan, razvrstan po dobavljaču, kao CSV spreman za uvoz u vaš ERP.</p></div>
+    </div>
+  </div>
+
+  <div class="w sec">
+    <h2>Kako ide</h2>
+    <ol class="steps">
+      <li><b>Preuzmite šprancu</b>Jednoobrazna tablica (Excel ili CSV). Obavezni su samo šifra artikla i prodaja po mjesecima.</li>
+      <li><b>Učitajte izvoz iz ERP-a</b>Prenesite podatke u šprancu i učitajte je. Ako želite samo vidjeti kako izgleda, tu je i primjer.</li>
+      <li><b>Pogledajte analizu, pa narudžbu</b>Prvo vidite strukturu zaliha i prodaje, a zatim količine za naručiti.</li>
+    </ol>
+    <p style="margin-top:22px;color:var(--muted)">Cijene, trenutna zaliha i dobavljač nisu obavezni, ali otključavaju vrijednosti u eurima i konkretnu narudžbu. Što manje podataka date, to će izračun biti grublji, a alat vam uvijek napiše što je koristio umjesto onoga što nedostaje.</p>
+  </div>
+
+  <div class="w sec">
+    <h2>Što ovaj alat radi, a što ne</h2>
+    <div class="note">
+      <p><b>Alat predlaže, ne odlučuje.</b> To je nacrt politike zaliha, a ne usvojena politika. Razinu usluge, tko odobrava odstupanja od prijedloga i tko je vlasnik roka isporuke po dobavljaču, određujete vi.</p>
+      <p style="margin:0">Sigurnosna zaliha računa se bez varijabilnosti roka isporuke, pa je to donja granica. Ako vam rokovi isporuke znatno variraju, stvarna rezerva treba biti veća. Iz iskustva, upravo tu najčešće puca plan.</p>
+    </div>
+    <p style="margin-top:20px;color:var(--muted)"><b style="color:var(--text)">Vaši podaci se ne spremaju.</b> Izračun se radi u memoriji i datoteka se nakon obrade ne čuva.</p>
+  </div>
+
+  <div class="w sec" style="padding-bottom:72px">
+    <button type="button" class="btn" id="sco-gumb2">Otvori alat</button>
+    <p class="who" style="margin-top:28px">Antonio Zrilić, Logiko d.o.o. · gotovo 20 godina iskustva u upravljanju lancem opskrbe, od optimizacije zaliha do planiranja i nabave.<span id="sco-dij" class="hid"> Treba vam pomoć s tumačenjem rezultata? <a class="l" id="sco-dij-link" href="#">Supply Chain dijagnostika 1 na 1</a>: ocjena stanja, mapa prioriteta i plan akcija za 90 dana.</span></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ---- podesite samo ovo ---- */
+  var APP_URL = "";          // npr. "https://stockoptimizer-analiza.onrender.com" (bez kosa crte na kraju)
+  var DIJAGNOSTIKA_URL = ""; // neobavezno: poveznica na stranicu o Supply Chain dijagnostici 1 na 1
+  /* ----------------------------- */
+
+  var gumbi = [document.getElementById("sco-gumb"), document.getElementById("sco-gumb2")];
+  var status = document.getElementById("sco-status");
+  var spreman = false, radi = false;
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  if (DIJAGNOSTIKA_URL) {
+    document.getElementById("sco-dij-link").href = DIJAGNOSTIKA_URL;
+    document.getElementById("sco-dij").classList.remove("hid");
+  }
+  if (!APP_URL) {
+    gumbi.forEach(function (g) { g.disabled = true; g.textContent = "Alat uskoro"; });
+    status.textContent = "";
+    return;
+  }
+
+  // Provjerava je li servis budan; vraća true čim stvarno odgovori (ili false nakon 90 s).
+  async function probudi() {
+    var start = Date.now();
+    while (Date.now() - start < 90000) {
+      try {
+        var r = await fetch(APP_URL + "/health", {cache: "no-store"});
+        if (r.ok) { var j = await r.json(); if (j && j.status === "ok") return true; }
+      } catch (e) { /* servis se još budi */ }
+      await sleep(3000);
+    }
+    return false;
+  }
+
+  // Čim se stranica otvori, budimo servis u pozadini dok posjetitelj čita.
+  probudi().then(function (ok) { spreman = ok; });
+
+  async function otvori() {
+    if (radi) return;
+    if (spreman) { window.location.href = APP_URL; return; }
+    radi = true;
+    gumbi.forEach(function (g) { g.disabled = true; });
+    status.textContent = "Pripremamo alat, to traje do minutu…";
+    var ok = await probudi();
+    window.location.href = APP_URL;  // i ako provjera ne uspije, otvaramo alat (preglednik će pričekati poslužitelj)
+  }
+  gumbi.forEach(function (g) { g.addEventListener("click", otvori); });
+})();
+</script>
