@@ -26,6 +26,10 @@ h2{font-size:1.1rem;color:var(--accent);margin-bottom:12px}
 .drop strong{display:block;font-size:1.05rem}
 .drop span{color:var(--muted);font-size:.9rem}
 .drop input{display:none}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px}
+.step{background:var(--panel2);border-radius:10px;padding:14px}
+.step b{display:block;color:var(--accent);font-size:.95rem}
+.step>span{color:var(--muted);font-size:.82rem;display:block;margin-top:2px}
 .link{color:var(--accent);text-decoration:none;font-size:.9rem}
 .link:hover{text-decoration:underline}
 details summary{cursor:pointer;color:var(--muted);font-size:.92rem;padding:6px 0}
@@ -108,12 +112,19 @@ footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
   <p class="lead">Učitajte izvoz iz ERP-a. Prvo vidite kako su zalihe i prodaja raspoređene po ABC/XYZ matrici, a zatim količine koje treba naručiti. Podaci se ne spremaju.</p>
 
   <form id="forma" class="card" novalidate>
+    <div class="steps">
+      <div class="step"><b>1 · Preuzmite šprancu</b><span>Jednoobrazna tablica za unos podataka iz ERP-a. Obavezni su samo šifra i 12 mjeseci prodaje.</span>
+        <span class="row" style="gap:8px;margin-top:8px">
+          <a class="btn ghost" href="/api/predlozak.xlsx" style="padding:8px 14px;font-size:.82rem">Excel (.xlsx)</a>
+          <a class="btn ghost" href="/api/predlozak.csv" style="padding:8px 14px;font-size:.82rem">CSV</a>
+          <a class="link" href="/api/primjer.xlsx">Primjer s podacima</a></span></div>
+      <div class="step"><b>2 · Učitajte popunjenu datoteku</b><span>Excel ili CSV, jedan redak po artiklu.</span></div>
+    </div>
     <label class="drop" id="drop" tabindex="0">
       <input type="file" id="datoteka" name="datoteka" accept=".xlsx,.xls,.csv">
       <strong id="imeDatoteke">Povucite izvoz ovdje ili kliknite za odabir</strong>
       <span>Excel ili CSV · najmanje: šifra artikla + 12 mjeseci prodaje (količine)</span>
     </label>
-    <p style="margin:10px 0 0"><a class="link" href="/api/predlozak.xlsx">Preuzmi predložak s primjerom i uputama</a></p>
     <details style="margin-top:10px">
       <summary>Što dobijete s kojim podacima</summary>
       <ul class="plain">

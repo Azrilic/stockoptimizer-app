@@ -181,3 +181,22 @@ def test_manje_od_12_mjeseci_je_greska():
     df = minimalni([[1] * 12]).drop(columns=["mj12"])
     with pytest.raises(GreskaUnosa):
         priprema(df)
+
+
+def test_csv_s_bomom_i_cp1250():
+    from engine import ucitaj, predlozak_csv, STUPCI_PREDLOSKA
+    redak = ";".join(["A1"] + [""] * 10 + [str(10 + i) for i in range(12)]) + "\n"
+    # špranca iz aplikacije (UTF-8 s BOM-om) s dopisanim retkom
+    d, _ = priprema(ucitaj(predlozak_csv() + redak.encode("utf-8"), "x.csv"))
+    assert d["sifra"].tolist() == ["A1"] and d["m12"].tolist() == [21]
+    # Windows-1250 s hrvatskim slovima i decimalnim zarezom
+    tekst = "Šifra;Naziv;Nabavna cijena;" + ";".join(f"M{i}" for i in range(1, 13)) + "\n" + \
+        "A1;Čokolada šuma;1,5;" + ";".join(["5"] * 12) + "\n"
+    d, _ = priprema(ucitaj(tekst.encode("cp1250"), "izvoz.csv"))
+    assert d["naziv"].tolist() == ["Čokolada šuma"] and d["nabavna"].tolist() == [1.5]
+
+
+def test_prazna_spranca_je_jasna_greska():
+    from engine import ucitaj, predlozak_csv
+    with pytest.raises(GreskaUnosa, match="nijednog retka"):
+        priprema(ucitaj(predlozak_csv(), "p.csv"))

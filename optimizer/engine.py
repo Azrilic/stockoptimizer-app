@@ -93,8 +93,18 @@ def ucitaj(sadrzaj: bytes, ime_datoteke: str) -> pd.DataFrame:
         if ime.endswith((".xlsx", ".xlsm", ".xls")):
             return pd.read_excel(io.BytesIO(sadrzaj))
         if ime.endswith((".csv", ".txt")):
-            return pd.read_csv(io.BytesIO(sadrzaj), sep=None, engine="python", decimal=",") \
-                if b";" in sadrzaj[:2000] else pd.read_csv(io.BytesIO(sadrzaj), sep=None, engine="python")
+            for kodiranje in ("utf-8-sig", "cp1250"):  # UTF-8 (s BOM-om ili bez), pa Windows-1250 iz starijih ERP-ova
+                try:
+                    tekst = sadrzaj.decode(kodiranje)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                raise GreskaUnosa("Kodiranje CSV datoteke nije prepoznato. Spremite je kao UTF-8 ili učitajte Excel.")
+            decimal = "," if ";" in tekst[:2000] else "."
+            return pd.read_csv(io.StringIO(tekst), sep=None, engine="python", decimal=decimal)
+    except GreskaUnosa:
+        raise
     except Exception as e:  # noqa: BLE001
         raise GreskaUnosa(f"Datoteku nije moguće pročitati: {e}") from e
     raise GreskaUnosa("Podržani su formati .xlsx i .csv.")
@@ -124,7 +134,9 @@ def priprema(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """Mapira stupce, čisti podatke i vraća (standardizirani okvir, upozorenja)."""
     upoz: list[str] = []
     df = df.copy()
-    df.columns = [str(c).strip() for c in df.columns]
+    df.columns = [str(c).strip().lstrip("\ufeff") for c in df.columns]
+    if len(df) == 0:
+        raise GreskaUnosa("Datoteka nema nijednog retka s podacima. Popunite šprancu (jedan redak po artiklu) pa je učitajte ponovno.")
     mapa: dict[str, str] = {}
     for kanon, aliasi in ALIASI.items():
         for stupac in df.columns:
@@ -540,28 +552,75 @@ def demo_podaci(n: int = 40, seed: int = 7) -> pd.DataFrame:
     return pd.DataFrame(redovi)
 
 
-def predlozak_excel() -> bytes:
+STUPCI_PREDLOSKA = ["Šifra", "Naziv", "Dobavljač", "Nabavna cijena", "Prodajna cijena", "Prosječna zaliha",
+                    "Trenutna zaliha", "Na putu", "Lead time", "MOQ", "Pakiranje"] + [f"Mjesec {i}" for i in range(1, 13)]
+
+_OBAVEZNI_PREDLOSKA = {"Šifra"} | {f"Mjesec {i}" for i in range(1, 13)}
+
+_OPISI_PREDLOSKA = {
+    "Šifra": "OBAVEZNO. Jedinstvena šifra artikla; jedan redak po artiklu, bez retka Total.",
+    "Naziv": "Neobavezno. Naziv artikla, radi čitljivosti.",
+    "Dobavljač": "Neobavezno. Omogućuje filtriranje i narudžbu po dobavljaču.",
+    "Nabavna cijena": "Neobavezno. Po komadu, u EUR. Daje pravi EOQ i vrijednosti u eurima.",
+    "Prodajna cijena": "Neobavezno. Po komadu, u EUR. ABC po prometu u eurima.",
+    "Prosječna zaliha": "Neobavezno. Prosječna zaliha u komadima kroz zadnjih 12 mjeseci. Za matricu zaliha, obrtaj i status.",
+    "Trenutna zaliha": "Neobavezno. Stanje u skladištu danas, u komadima. Bez njega nema količine za naručiti ovaj tjedan.",
+    "Na putu": "Neobavezno. Već naručeno, a nije stiglo (komadi). Da se ne naruči dvaput.",
+    "Lead time": "Neobavezno. Stvarni rok isporuke u danima. Bez njega se koristi zadani (21 dan).",
+    "MOQ": "Neobavezno. Minimalna količina narudžbe.",
+    "Pakiranje": "Neobavezno. Narudžba se zaokružuje na višekratnik pakiranja.",
+    "Mjesec 1": "OBAVEZNO. Količina prodaje (komadi) u najstarijem od 12 mjeseci. Mjesec 12 je najnoviji.",
+}
+_UPUTE_PREDLOSKA = [
+    ("Što je obavezno", "Samo šifra artikla i 12 mjeseci prodaje (količine u komadima). Sve ostalo je dodatak."),
+    ("Mjeseci", "Mjesec 1 je najstariji, Mjesec 12 najnoviji (zadnji zaključeni mjesec). Stupci moraju stajati jedan do drugoga."),
+    ("Prazne ćelije", "Prazna ćelija prodaje računa se kao 0. Negativne prodaje (povrati) računaju se kao 0."),
+    ("Retci", "Jedan redak po artiklu. Obrišite retke s ukupnim zbrojem (Total)."),
+    ("Nazivi stupaca", "Možete mijenjati redoslijed stupaca i brisati neobavezne. Aplikacija prepoznaje i uobičajene nazive (npr. SKU, Supplier, Stanje)."),
+    ("Količine", "Sve količine su u komadima (ili osnovnoj jedinici mjere), cijene u EUR po komadu."),
+    ("Što dobijete s kojim podacima", "Šifra + 12 mjeseci: ABC/XYZ, sigurnosna zaliha, točka naručivanja, količina po narudžbi. "
+        "+ Prosječna zaliha: matrica zaliha, obrtaj, status. + Nabavna cijena: EOQ i vrijednosti u €. "
+        "+ Trenutna zaliha (i Na putu): što naručiti ovaj tjedan. + Dobavljač: narudžba po dobavljaču."),
+]
+
+
+def predlozak_excel(s_primjerom: bool = False) -> bytes:
+    """Prazna (ili popunjena izmišljenim podacima) šprancu za unos izvoza iz ERP-a."""
+    from openpyxl.comments import Comment
+    from openpyxl.styles import Alignment, Font, PatternFill
+    if s_primjerom:
+        podaci = demo_podaci()[STUPCI_PREDLOSKA[:11] + [f"Mjesec {i}" for i in range(1, 13)]]
+    else:
+        podaci = pd.DataFrame(columns=STUPCI_PREDLOSKA)
+    upute = pd.DataFrame(_UPUTE_PREDLOSKA, columns=["Tema", "Objašnjenje"])
     buf = io.BytesIO()
-    upute = pd.DataFrame({
-        "Stupac": ["Šifra", "Mjesec 1 … Mjesec 12", "Trenutna zaliha", "Na putu", "Nabavna cijena", "Prodajna cijena",
-                   "Prosječna zaliha", "Dobavljač", "Lead time", "Naziv, MOQ, Pakiranje"],
-        "Obavezno": ["DA", "DA (12 stupaca)", "ne", "ne", "ne", "ne", "ne", "ne", "ne", "ne"],
-        "Što otključava": [
-            "Identifikacija artikla.",
-            "ABC/XYZ, sigurnosna zaliha, točka naručivanja i količina po narudžbi. To je sve što je potrebno za izračun.",
-            "Količinu koju treba naručiti ovaj tjedan (bez nje se računa samo količina po narudžbi).",
-            "Da se već naručena roba ne naruči dvaput.",
-            "Pravi EOQ i vrijednosti u eurima. Bez nje količina po narudžbi je potražnja za 4 tjedna.",
-            "ABC po prometu u eurima (bez nje ABC ide po nabavnoj vrijednosti ili količini).",
-            "Obrtaj, dane zalihe, status artikla i usporedbu strukture zaliha i prodaje.",
-            "Narudžbu razdvojenu po dobavljaču.",
-            "Stvarne rokove isporuke (bez njega se koristi zadanih 21 dan).",
-            "Čitljiviji ispis te zaokruživanje narudžbe na minimum i pakiranje."]})
     with pd.ExcelWriter(buf, engine="openpyxl") as w:
-        demo_podaci().to_excel(w, sheet_name="Podaci", index=False)
+        podaci.to_excel(w, sheet_name="Podaci", index=False)
         upute.to_excel(w, sheet_name="Upute", index=False)
-        for ws in w.book.worksheets:
-            ws.freeze_panes = "A2"
-            for col in ws.columns:
-                ws.column_dimensions[col[0].column_letter].width = min(max(10, max(len(str(c.value or "")) for c in col[:60]) + 2), 60)
+        ws = w.book["Podaci"]
+        for i, naziv in enumerate(STUPCI_PREDLOSKA, 1):
+            c = ws.cell(row=1, column=i)
+            obav = naziv in _OBAVEZNI_PREDLOSKA
+            c.fill = PatternFill("solid", fgColor="FF8A3D" if obav else "D9D9D9")
+            c.font = Font(bold=True, color="000000")
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            opis = _OPISI_PREDLOSKA.get(naziv, "OBAVEZNO. Količina prodaje (komadi) u tom mjesecu." if obav else "")
+            if opis:
+                c.comment = Comment(opis, "StockOptimizer", width=320, height=110)
+            ws.column_dimensions[c.column_letter].width = 16 if i > 11 else 18
+        ws.row_dimensions[1].height = 32
+        ws.freeze_panes = "B2"
+        wu = w.book["Upute"]
+        wu.column_dimensions["A"].width = 30
+        wu.column_dimensions["B"].width = 110
+        for r in wu.iter_rows(min_row=2):
+            for c in r:
+                c.alignment = Alignment(wrap_text=True, vertical="top")
+        for c in wu[1]:
+            c.font = Font(bold=True)
     return buf.getvalue()
+
+
+def predlozak_csv() -> bytes:
+    """Prazna CSV šprance: zaglavlje s točkom-zarezom, UTF-8 s BOM-om (otvara se ispravno u Excelu)."""
+    return ("\ufeff" + ";".join(STUPCI_PREDLOSKA) + "\n").encode("utf-8")

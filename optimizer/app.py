@@ -121,10 +121,25 @@ def izvoz_csv():
                      download_name="narudzba.csv", mimetype="text/csv")
 
 
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
 @app.route("/api/predlozak.xlsx")
 def predlozak():
-    return send_file(io.BytesIO(engine.predlozak_excel()), as_attachment=True, download_name="stockoptimizer-predlozak.xlsx",
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(io.BytesIO(engine.predlozak_excel()), as_attachment=True,
+                     download_name="stockoptimizer-predlozak.xlsx", mimetype=XLSX)
+
+
+@app.route("/api/predlozak.csv")
+def predlozak_csv():
+    return send_file(io.BytesIO(engine.predlozak_csv()), as_attachment=True,
+                     download_name="stockoptimizer-predlozak.csv", mimetype="text/csv")
+
+
+@app.route("/api/primjer.xlsx")
+def primjer():
+    return send_file(io.BytesIO(engine.predlozak_excel(s_primjerom=True)), as_attachment=True,
+                     download_name="stockoptimizer-primjer.xlsx", mimetype=XLSX)
 
 
 if __name__ == "__main__":
