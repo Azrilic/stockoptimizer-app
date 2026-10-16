@@ -31,9 +31,12 @@ Zadano: razine usluge A 98 % / B 95 % / C 90 %, S = 60 € po narudžbi, h = 20 
 - **GMROI** = godišnja bruto marža / prosječna zaliha po nabavnoj cijeni: koliko eura bruto marže godišnje donosi euro uložen u zalihe.
   Prikazuje se po artiklu i za cijelu zalihu (treba obje cijene i prosječnu zalihu).
 - **Cash-flow potencijal zaliha (otkupna vrijednost zaliha):** koliko bi zalihe stvarno vrijedile da ih danas želite pretvoriti u
-  gotovinu. Vrijednost zalihe (po nabavnoj cijeni) razvrstana je po koeficijentu obrtaja artikla u pojaseve
-  (bez prodaje, do 1, 1 do 2, 2 do 3, 3 do 4, 4 do 6, preko 6) i množi se postotkom otkupne vrijednosti. Zadani postoci su
-  30 / 40 / 60 / 80 / 85 / 90 / 97 % i **samo su procjena**; mijenjaju se u Pretpostavkama (u kodu: `Parametri.cf_faktori`).
+  gotovinu. Uvijek četiri kategorije prema koeficijentu obrtaja artikla: **do 1** (uključuje zalihu bez ikakve prodaje), **1 do 2**,
+  **2 do X** i **preko X**. Gornji prag X je zaokruženi medijan obrtaja artikala koji se prodaju, ali najmanje 3 i najviše 5
+  (može se zadati ručno), pa su kategorije uvijek cijeli brojevi i prilagođene firmi. Vrijednost zalihe (po nabavnoj cijeni) množi se
+  postotkom kategorije. Zadani postoci su 30 / 60 / 85 / 97 % i **samo su procjena**; mijenjaju se u Pretpostavkama
+  (u kodu: `Parametri.cf_faktori`, `Parametri.cf_prag`). U sučelju je prvo rezultat (zaokružen) i rečenica o glavnom nalazu,
+  a tablica je u rasklopljenom odjeljku "Kako smo to izračunali".
 
 ## Špranca za unos
 

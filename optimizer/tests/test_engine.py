@@ -232,30 +232,42 @@ def test_bez_cijena_nema_marze_ni_gmroi():
     assert r.sazetak["cashflow"] is None
 
 
-def test_cashflow_pojasi_i_faktori():
-    # obrtaj = potražnja / zaliha: 0,5 -> 'do 1' (40 %), 3 -> '2 do 3' (80 %), bez prodaje -> 'Bez prodaje' (30 %)
+def test_cashflow_cetiri_kategorije_i_faktori():
+    # obrtaj 0,5 -> 'do 1' (30 %), obrtaj 3 -> '2 do 3' (85 %), bez prodaje ulazi u 'do 1' (30 %)
     d, _ = priprema(_puni([([5] * 12, 10.0, 15.0, 120),    # D=60, zaliha 120  -> obrtaj 0,5
                            ([30] * 12, 10.0, 15.0, 120),   # D=360, zaliha 120 -> obrtaj 3
                            ([0] * 12, 10.0, 15.0, 50)]))   # bez prodaje, zaliha 50
     r = izracunaj(d, Parametri())
     a = r.artikli
-    assert list(a["cf_pojas"]) == [1, 3, 0]
-    assert a.loc[0, "cf_realna"] == pytest.approx(1200 * 0.40)
-    assert a.loc[1, "cf_realna"] == pytest.approx(1200 * 0.80)
+    assert list(a["cf_pojas"]) == [0, 2, 0]
+    assert a.loc[0, "cf_realna"] == pytest.approx(1200 * 0.30)
+    assert a.loc[1, "cf_realna"] == pytest.approx(1200 * 0.85)
     assert a.loc[2, "cf_realna"] == pytest.approx(500 * 0.30)
     cf = r.sazetak["cashflow"]
+    assert len(cf["redovi"]) == 4 and cf["prag"] == 3          # medijan 1,75 -> prag najmanje 3
+    assert [x["pojas"] for x in cf["redovi"]] == ["do 1", "1 do 2", "2 do 3", "preko 3"]
     assert cf["vrijednost"] == pytest.approx(1200 + 1200 + 500)
-    assert cf["realna"] == pytest.approx(480 + 960 + 150)
+    assert cf["realna"] == pytest.approx(360 + 1020 + 150)
     assert cf["umanjenje"] == pytest.approx(cf["vrijednost"] - cf["realna"])
-    assert sum(x["artikala"] for x in cf["redovi"]) == 3
-    # vlastiti faktori
-    r2 = izracunaj(d, Parametri(cf_faktori=(0, 50, 50, 50, 50, 50, 50)))
-    assert r2.sazetak["cashflow"]["realna"] == pytest.approx(0.5 * 2400)
+    assert cf["mrtva_artikala"] == 1 and cf["mrtva_vrijednost"] == pytest.approx(500)
+    r2 = izracunaj(d, Parametri(cf_faktori=(0, 50, 50, 50)))   # vlastiti postoci
+    assert r2.sazetak["cashflow"]["realna"] == pytest.approx(0.5 * 1200 + 0 * 1200 + 0)
+
+
+def test_gornji_prag_cashflowa_je_zaokruzeni_medijan_od_3_do_5():
+    from engine import cf_prag, cf_pojasi
+    s = lambda *v: pd.Series(v, dtype=float)
+    assert cf_prag(s(0.6, 1.2, 2.0)) == 3          # spora firma: najmanje 3
+    assert cf_prag(s(3.6, 3.8, 4.2)) == 4          # medijan 3,8 -> 4
+    assert cf_prag(s(8, 12, 30)) == 5              # brza firma: najviše 5
+    assert cf_prag(pd.Series([], dtype=float)) == 3
+    assert cf_prag(s(1, 2), zadano=6) == 6         # ručno zadan prag
+    assert cf_pojasi(4) == ["do 1", "1 do 2", "2 do 4", "preko 4"]
 
 
 def test_zadani_faktori_su_konzervativni_i_padaju_s_obrtajem():
     f = Parametri().cf_faktori
-    assert f == (30, 40, 60, 80, 85, 90, 97)
+    assert f == (30, 60, 85, 97)
     assert all(a <= b for a, b in zip(f, f[1:]))  # što sporiji obrtaj, to manji faktor
 
 

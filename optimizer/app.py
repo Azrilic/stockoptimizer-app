@@ -41,6 +41,14 @@ def parametri_iz(src) -> Parametri:
     if any(not 0 <= f <= 100 for f in faktori):
         raise GreskaUnosa("Faktori realizacije moraju biti između 0 i 100 %.")
     p.cf_faktori = tuple(faktori)
+    prag = src.get("cf_prag")
+    if prag not in (None, ""):
+        try:
+            p.cf_prag = float(str(prag).replace(",", "."))
+        except ValueError as e:
+            raise GreskaUnosa("Prag koeficijenta obrtaja mora biti broj.") from e
+        if not 2 <= p.cf_prag <= 20:
+            raise GreskaUnosa("Prag koeficijenta obrtaja mora biti između 2 i 20.")
     if p.trosak_narudzbe < 0 or p.drzanje_postotak <= 0 or p.lead_time_default <= 0 or p.pokrivenost_tjedana <= 0:
         raise GreskaUnosa("Trošak narudžbe ne smije biti negativan, a držanje, lead time i pokrivenost moraju biti veći od nule.")
     if not (0 < p.abc_a < p.abc_b <= 100):

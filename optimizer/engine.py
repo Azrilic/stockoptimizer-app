@@ -50,7 +50,8 @@ class Parametri:
     trosak_narudzbe: float = 60.0   # S, EUR po narudžbi
     drzanje_postotak: float = 20.0  # h, % nabavne cijene godišnje (H = h * nabavna)
     lead_time_default: float = 21.0  # dani, kad izvoz nema lead time
-    cf_faktori: tuple = (30, 40, 60, 80, 85, 90, 97)  # % otkupne vrijednosti zalihe po pojasu obrtaja (procjena)
+    cf_faktori: tuple = (30, 60, 85, 97)  # % otkupne vrijednosti zalihe: do 1 (uklj. bez prodaje) | 1 do 2 | 2 do praga | preko praga (procjena)
+    cf_prag: float | None = None  # gornji prag; None = zaokruženi medijan obrtaja, ali najmanje 3 i najviše 5
     pokrivenost_tjedana: float = 4.0  # količina po narudžbi kad nema nabavne cijene (EOQ nije moguć)
     abc_a: float = 80.0
     abc_b: float = 95.0
@@ -62,7 +63,21 @@ class Parametri:
         return z_vrijednost(razina)
 
 
-CF_POJASI = ["Bez prodaje", "do 1", "1 do 2", "2 do 3", "3 do 4", "4 do 6", "preko 6"]
+CF_PRAG_MIN, CF_PRAG_MAX = 3, 5
+
+
+def cf_prag(obrtaji: pd.Series, zadano: float | None = None) -> int:
+    """Gornji prag cash-flow kategorija: zaokruženi medijan obrtaja artikala koji se prodaju, najmanje 3, najviše 5."""
+    if zadano:
+        return int(round(zadano))
+    med = obrtaji.median()
+    if pd.isna(med):
+        return CF_PRAG_MIN
+    return int(min(CF_PRAG_MAX, max(CF_PRAG_MIN, np.floor(med + 0.5))))
+
+
+def cf_pojasi(prag: int) -> list[str]:
+    return ["do 1", "1 do 2", f"2 do {prag}", f"preko {prag}"]
 
 
 def z_vrijednost(razina: float) -> float:
@@ -366,9 +381,10 @@ def izracunaj(df: pd.DataFrame, p: Parametri, upozorenja: list[str] | None = Non
     ima_cf = bool(ima_cijene and ima_zalihu)
     ima_vr = a["vrijednost_zalihe"] > 0
     o = a["obrtaj"]
-    pojas = np.select(
-        [a["potraznja_god"] <= 0, o <= 1, o <= 2, o <= 3, o <= 4, o <= 6],
-        [0, 1, 2, 3, 4, 5], default=6)
+    prodaje_se = (a["potraznja_god"] > 0) & (a["zaliha"] > 0)
+    prag = cf_prag(o[prodaje_se], p.cf_prag)
+    # četiri kategorije: bez prodaje ulazi u 'do 1'
+    pojas = np.select([a["potraznja_god"] <= 0, o <= 1, o <= 2, o <= prag], [0, 0, 1, 2], default=3)
     a["cf_pojas"] = pd.Series(pojas, index=a.index).where(ima_vr)
     faktori = np.array(p.cf_faktori, dtype=float)
     a["cf_faktor"] = a["cf_pojas"].map(lambda i: faktori[int(i)] if pd.notna(i) else np.nan)
@@ -396,7 +412,7 @@ def izracunaj(df: pd.DataFrame, p: Parametri, upozorenja: list[str] | None = Non
     uskl = _uskladjenost(a, ima_zalihu, ima_cijene)
     saz = _sazetak(a, uskl, p, ima_cijene, ima_zalihu, abc_osnova)
     saz["ima_marzu"] = ima_marzu
-    saz["cashflow"] = _cashflow(a, p) if ima_cf else None
+    saz["cashflow"] = _cashflow(a, p, prag, float(o[prodaje_se].median()) if prodaje_se.any() else None) if ima_cf else None
     gm_pod = a["gmroi"].notna()
     saz["gmroi"] = (float(a.loc[gm_pod, "marza_god"].sum() / a.loc[gm_pod, "vrijednost_zalihe"].sum())
                     if gm_pod.any() and a.loc[gm_pod, "vrijednost_zalihe"].sum() > 0 else None)
@@ -414,8 +430,11 @@ def izracunaj(df: pd.DataFrame, p: Parametri, upozorenja: list[str] | None = Non
         f"Mjesec se računa kao {DANA_U_MJESECU:g} dana; σ potražnje je uzorkovana standardna devijacija 12 mjeseci.",
         "Narudžba: ako je zaliha na stanju plus na putu na ili ispod točke naručivanja, naručuje se višekratnik EOQ-a "
         "(zaokruženo na MOQ i pakiranje) dovoljan da pozicija prijeđe točku naručivanja.",
-        *([f"Cash-flow potencijal (otkupna vrijednost zaliha): koliko bi zalihe stvarno vrijedile da ih danas želite pretvoriti u gotovinu. To je vrijednost zalihe po nabavnoj cijeni umanjena faktorom realizacije prema koeficijentu obrtaja "
-           f"({', '.join(f'{l}: {f:g}%' for l, f in zip(CF_POJASI, p.cf_faktori))}). Faktori su procjena i mijenjaju se u pretpostavkama."]
+        *([f"Cash-flow potencijal (otkupna vrijednost zaliha): koliko bi zalihe stvarno vrijedile da ih danas želite pretvoriti u gotovinu. "
+           f"Vrijednost zalihe po nabavnoj cijeni množi se postotkom prema koeficijentu obrtaja, u četiri kategorije: "
+           f"{', '.join(f'{l}: {f:g}%' for l, f in zip(cf_pojasi(prag), p.cf_faktori))}. Zaliha bez ikakve prodaje ulazi u prvu kategoriju. "
+           f"Gornji prag ({prag}) je " + ("zadan ručno" if p.cf_prag else "zaokruženi medijan obrtaja vaših artikala (najmanje 3, najviše 5)") +
+           ". Postoci su procjena i mijenjaju se u pretpostavkama."]
           if ima_cf else []),
         *(["GMROI = godišnja bruto marža / prosječna zaliha po nabavnoj cijeni: koliko eura bruto marže godišnje donosi euro uložen u zalihe."]
           if ima_marzu and ima_zalihu else []),
@@ -458,11 +477,11 @@ def _uskladjenost(a: pd.DataFrame, ima_zalihu: bool = True, ima_cijene: bool = T
     return pd.DataFrame(redovi)
 
 
-def _cashflow(a: pd.DataFrame, p: Parametri) -> dict:
+def _cashflow(a: pd.DataFrame, p: Parametri, prag: int, medijan: float | None) -> dict:
     ima = a["cf_pojas"].notna()
     ukupno = float(a.loc[ima, "vrijednost_zalihe"].sum())
     redovi = []
-    for i, naziv in enumerate(CF_POJASI):
+    for i, naziv in enumerate(cf_pojasi(prag)):
         m = ima & (a["cf_pojas"] == i)
         v = float(a.loc[m, "vrijednost_zalihe"].sum())
         f = float(p.cf_faktori[i])
@@ -470,7 +489,10 @@ def _cashflow(a: pd.DataFrame, p: Parametri) -> dict:
                        "udio": v / ukupno * 100 if ukupno else 0.0, "faktor": f,
                        "realna": v * f / 100, "umanjenje": v - v * f / 100})
     realna = sum(r["realna"] for r in redovi)
-    return {"redovi": redovi, "vrijednost": ukupno, "realna": realna, "umanjenje": ukupno - realna}
+    mrtva = ima & (a["potraznja_god"] <= 0)
+    return {"redovi": redovi, "vrijednost": ukupno, "realna": realna, "umanjenje": ukupno - realna,
+            "prag": prag, "medijan": medijan, "prag_rucno": bool(p.cf_prag),
+            "mrtva_artikala": int(mrtva.sum()), "mrtva_vrijednost": float(a.loc[mrtva, "vrijednost_zalihe"].sum())}
 
 
 def hr(x: float) -> str:
