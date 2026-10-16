@@ -421,8 +421,10 @@ def izracunaj(df: pd.DataFrame, p: Parametri, upozorenja: list[str] | None = Non
     pretp += [
         f"Sigurnosna zaliha = z × σ × vremenski faktor, gdje je vremenski faktor √(LT / horizont planiranja). σ je standardna devijacija "
         f"potražnje po mjesecu (iz 12 mjeseci prodaje), pa je horizont planiranja {DANA_U_MJESECU:g} dana, a LT je rok isporuke u danima. "
-        f"Vremenski faktor preračunava mjesečnu varijabilnost potražnje na razdoblje roka isporuke: npr. za LT od 21 dan je "
-        f"√(21 / {DANA_U_MJESECU:g}) = {np.sqrt(21 / DANA_U_MJESECU):.2f}. Razina usluge z po klasi: "
+        f"Vremenski faktor preračunava mjesečnu varijabilnost potražnje na razdoblje roka isporuke. Ako je rok isporuke kraći od horizonta, "
+        f"faktor je manji od 1 i sigurnosna zaliha je manja, jer ima vremena reagirati ako potražnja poraste. Ako je rok dulji od horizonta, "
+        f"faktor je veći od 1 i povećava sigurnosnu zalihu. Primjeri: LT od 21 dan daje √(21 / {DANA_U_MJESECU:g}) = {np.sqrt(21 / DANA_U_MJESECU):.2f}, "
+        f"a LT od 45 dana √(45 / {DANA_U_MJESECU:g}) = {np.sqrt(45 / DANA_U_MJESECU):.2f}. Razina usluge z po klasi: "
         f"A {p.razina_a}% (z = {p.z_za('A')}), B {p.razina_b}% (z = {p.z_za('B')}), C {p.razina_c}% (z = {p.z_za('C')}).",
         "Ova sigurnosna zaliha pretpostavlja da rok isporuke ne varira (uzima se samo varijabilnost potražnje). To je donja granica.",
         f"Točka ponovnog naručivanja = prosječna dnevna potražnja × LT + sigurnosna zaliha, uz dnevnu potražnju kao mjesečnu / {DANA_U_MJESECU:g}.",
@@ -671,6 +673,7 @@ def demo_podaci(n: int = 40, seed: int = 7) -> pd.DataFrame:
 OPISI_STUPACA = [
     ("Šifra", True, "Svaki artikl mora imati jedinstvenu šifru, jedan redak po artiklu. Bez šifre aplikacija ne može razlikovati artikle."),
     ("Naziv", False, "Ako upišete naziv artikla, popis artikala i narudžba bit će čitljiviji. Za sam izračun naziv nije potreban."),
+    ("Mjesec 1 do 12", True, "Upišite koliko ste komada prodali u svakom od zadnjih 12 mjeseci (Mjesec 1 je najstariji). Iz toga aplikacija računa ABC/XYZ analizu, sigurnosnu zalihu, točku ponovnog naručivanja i količinu po jednoj narudžbi."),
     ("Dobavljač", False, "Ako upišete dobavljača, narudžbe se razdvajaju po dobavljaču, pa za svakog dobavljača dobijete zasebnu narudžbu. Cijelu analizu možete i filtrirati po dobavljaču."),
     ("Nabavna cijena", False, "Ako upišete nabavnu cijenu, aplikacija izražava zalihe i narudžbe u eurima (vrijednost zaliha, vrijednost narudžbe) i računa optimalnu količinu narudžbe prema EOQ metodi, a to je količina uz koju je ukupni trošak naručivanja i držanja zaliha najmanji. Uz prosječnu zalihu dobivate i cash-flow potencijal zaliha."),
     ("Prodajna cijena", False, "Ako uz nabavnu cijenu upišete i prodajnu, aplikacija računa maržu svakog artikla i omogućuje ABC analizu po marži, što je posebno korisno trgovačkim tvrtkama. Uz prosječnu zalihu računa i GMROI, tj. koliko eura bruto marže godišnje donosi svaki euro uložen u zalihe."),
@@ -680,9 +683,8 @@ OPISI_STUPACA = [
     ("Lead time", False, "Ako upišete stvarni rok isporuke u danima, sigurnosna zaliha i točka naručivanja računaju se prema stvarnim rokovima. Bez toga koristi se zadanih 21 dan."),
     ("MOQ", False, "Ako upišete minimalnu količinu koju dobavljač isporučuje, aplikacija neće predložiti narudžbu ispod te količine."),
     ("Pakiranje", False, "Ako upišete veličinu pakiranja, količine za narudžbu zaokružuju se na cijela pakiranja."),
-    ("Mjesec 1 do 12", True, "Upišite koliko ste komada prodali u svakom od zadnjih 12 mjeseci (Mjesec 1 je najstariji). Iz toga aplikacija računa ABC/XYZ analizu, sigurnosnu zalihu, točku ponovnog naručivanja i količinu po jednoj narudžbi."),
 ]
-STUPCI_PREDLOSKA = [n for n, _, _ in OPISI_STUPACA[:-1]] + [f"Mjesec {i}" for i in range(1, 13)]
+STUPCI_PREDLOSKA = [c for n, _, _ in OPISI_STUPACA for c in ([f"Mjesec {i}" for i in range(1, 13)] if n == "Mjesec 1 do 12" else [n])]
 _OBAVEZNI_PREDLOSKA = {"Šifra"} | {f"Mjesec {i}" for i in range(1, 13)}
 
 
@@ -741,7 +743,7 @@ def predlozak_excel(s_primjerom: bool = False) -> bytes:
             d.font = Font(italic=True, color="555555", size=9)
             d.alignment = Alignment(wrap_text=True, vertical="top")
             d.fill = PatternFill("solid", fgColor="F2F2F2")
-            ws.column_dimensions[c.column_letter].width = 16 if i > 11 else 34
+            ws.column_dimensions[c.column_letter].width = 14 if naziv.startswith("Mjesec") else 30
         ws.row_dimensions[1].height = 32
         ws.row_dimensions[2].height = 150
         ws.freeze_panes = "B3"

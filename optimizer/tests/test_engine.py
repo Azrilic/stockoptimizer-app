@@ -185,7 +185,7 @@ def test_manje_od_12_mjeseci_je_greska():
 
 def test_csv_s_bomom_i_cp1250():
     from engine import ucitaj, predlozak_csv, STUPCI_PREDLOSKA
-    redak = ";".join(["A1"] + [""] * 10 + [str(10 + i) for i in range(12)]) + "\n"
+    redak = ";".join(["A1", ""] + [str(10 + i) for i in range(12)] + [""] * 9) + "\n"
     # špranca iz aplikacije (UTF-8 s BOM-om) s dopisanim retkom
     d, _ = priprema(ucitaj(predlozak_csv() + redak.encode("utf-8"), "x.csv"))
     assert d["sifra"].tolist() == ["A1"] and d["m12"].tolist() == [21]
@@ -273,7 +273,7 @@ def test_zadani_faktori_su_konzervativni_i_padaju_s_obrtajem():
 
 def test_spranca_ima_opisni_redak_koji_se_preskace():
     from engine import ucitaj, predlozak_csv, predlozak_excel
-    redak = ";".join(["A1"] + [""] * 10 + [str(10 + i) for i in range(12)]) + "\n"
+    redak = ";".join(["A1", ""] + [str(10 + i) for i in range(12)] + [""] * 9) + "\n"
     d, _ = priprema(ucitaj(predlozak_csv() + redak.encode("utf-8"), "x.csv"))
     assert d["sifra"].tolist() == ["A1"]                       # opisni redak nije postao artikl
     with pytest.raises(GreskaUnosa, match="nijednog retka"):
@@ -285,7 +285,7 @@ def test_spranca_ima_opisni_redak_koji_se_preskace():
 def test_decimalni_zarez_uz_opisni_redak():
     from engine import ucitaj, predlozak_csv
     zaglavlje = predlozak_csv().decode("utf-8").split("\n")[:2]
-    redak = ";".join(["A1", "Naziv", "Dob", "1,5", "2,25", "10", "", "", "", "", ""] + ["5"] * 12)
+    redak = ";".join(["A1", "Naziv"] + ["5"] * 12 + ["Dob", "1,5", "2,25", "10", "", "", "", "", ""])
     csv = "\n".join(zaglavlje + [redak]).encode("utf-8")
     d, _ = priprema(ucitaj(csv, "x.csv"))
     assert d["nabavna"].tolist() == [1.5] and d["prodajna"].tolist() == [2.25]
@@ -306,5 +306,13 @@ def test_objasnjenje_sigurnosne_zalihe_navodi_vremenski_faktor():
     d, _ = priprema(minimalni([[10, 12, 9, 11, 14, 10, 8, 12, 13, 9, 11, 10]]))
     tekst = " ".join(izracunaj(d, Parametri()).pretpostavke)
     assert "vremenski faktor" in tekst and "horizont planiranja" in tekst
-    assert "√(21 / 30) = 0.84" in tekst
+    assert "√(21 / 30) = 0.84" in tekst and "√(45 / 30) = 1.22" in tekst
+    assert "kraći od horizonta" in tekst and "veći od 1" in tekst
     assert "Točka ponovnog naručivanja" in tekst
+
+
+def test_obavezni_stupci_su_u_spranci_odmah_lijevo():
+    from engine import STUPCI_PREDLOSKA
+    assert STUPCI_PREDLOSKA[:2] == ["Šifra", "Naziv"]
+    assert STUPCI_PREDLOSKA[2:14] == [f"Mjesec {i}" for i in range(1, 13)]   # 12 mjeseci odmah iza šifre i naziva
+    assert len(STUPCI_PREDLOSKA) == 23 and len(set(STUPCI_PREDLOSKA)) == 23

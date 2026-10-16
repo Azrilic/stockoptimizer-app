@@ -139,6 +139,7 @@ footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
     </label>
     <details id="sprancaBox" style="margin-top:10px" open>
       <summary>Što dobijete s kojim podacima (kliknite na stupac)</summary>
+      <p class="note" style="margin:8px 0 0"><b style="color:var(--accent)">Obavezno su samo šifra artikla i količine prodaje za zadnjih 12 mjeseci</b> (narančasti stupci). Sivi stupci su neobavezni, a svaki otključava dodatne rezultate.</p>
       <div class="xl" id="xl" aria-label="Pregled špranci"></div>
       <div class="xlinfo" id="xlinfo" role="status" aria-live="polite"></div>
     </details>
@@ -496,19 +497,20 @@ const CF_ZADANO = [30, 70, 85, 97];
 $("#cfInputs").innerHTML = CF_POJASI.map((l, i) => `<label>Obrtaj ${l}: otkupna vrijednost (%)<input type="number" name="cf_${i}" value="${CF_ZADANO[i]}" min="0" max="100" step="1"></label>`).join("")
   + `<label>Gornji prag obrtaja<input type="number" name="cf_prag" placeholder="automatski" min="2" max="20" step="1"><small>Prazno = zaokruženi medijan obrtaja vaših artikala, najmanje 3 i najviše 5.</small></label>`;
 
-const PRIMJER = [["ART-001", "Vijak M6", "Alfa d.o.o.", "0,12", "0,20", "3.100", "1.500", "0", "14", "1.000", "500"],
-                 ["ART-002", "Matica M6", "Alfa d.o.o.", "0,05", "0,09", "2.400", "900", "2.000", "14", "2.000", "1.000"],
-                 ["ART-003", "Podloška", "Beta trgovina", "0,02", "0,04", "8.700", "300", "0", "7", "0", "5.000"]];
-const MJ = [["120", "…", "95"], ["80", "…", "60"], ["310", "…", "280"]];
+const PRIMJER = [
+  {"Šifra": "ART-001", "Naziv": "Vijak M6", "Dobavljač": "Alfa d.o.o.", "Nabavna cijena": "0,12", "Prodajna cijena": "0,20", "Prosječna zaliha": "3.100", "Trenutna zaliha": "1.500", "Na putu": "0", "Lead time": "14", "MOQ": "1.000", "Pakiranje": "500", mj: ["120", "…", "95"]},
+  {"Šifra": "ART-002", "Naziv": "Matica M6", "Dobavljač": "Alfa d.o.o.", "Nabavna cijena": "0,05", "Prodajna cijena": "0,09", "Prosječna zaliha": "2.400", "Trenutna zaliha": "900", "Na putu": "2.000", "Lead time": "14", "MOQ": "2.000", "Pakiranje": "1.000", mj: ["80", "…", "60"]},
+  {"Šifra": "ART-003", "Naziv": "Podloška", "Dobavljač": "Beta trgovina", "Nabavna cijena": "0,02", "Prodajna cijena": "0,04", "Prosječna zaliha": "8.700", "Trenutna zaliha": "300", "Na putu": "0", "Lead time": "7", "MOQ": "0", "Pakiranje": "5.000", mj: ["310", "…", "280"]}];
 async function sprancaPregled() {
   let stupci;
   try { const r = await fetch("/api/stupci"); if (!r.ok) throw 0; stupci = await r.json(); } catch (e) { $("#sprancaBox").classList.add("hidden"); return; }
+  const jeMj = (c) => c.naziv.startsWith("Mjesec");
   const info = (i) => { const c = stupci[i]; $("#xlinfo").innerHTML = `<b>${esc(c.naziv)}</b><span class="tag ${c.obavezno ? "Uredno" : ""}">${c.obavezno ? "obavezno" : "neobavezno"}</span><p style="margin:6px 0 0">${esc(c.opis)}</p>`; document.querySelectorAll(".xh").forEach((b) => b.classList.toggle("on", +b.dataset.i === i)); };
-  const th = stupci.map((c, i) => `<th ${i === stupci.length - 1 ? 'colspan="3"' : ""}><button type="button" class="xh ${c.obavezno ? "req" : ""}" data-i="${i}" aria-label="${esc(c.naziv)}: što se dobiva"><span>${esc(c.naziv)}</span><span class="ic" aria-hidden="true">i</span></button></th>`).join("");
-  const tr = PRIMJER.map((r, k) => `<tr>${r.map((v) => `<td>${esc(v)}</td>`).join("")}${MJ[k].map((v) => `<td>${v}</td>`).join("")}</tr>`).join("");
+  const th = stupci.map((c, i) => `<th ${jeMj(c) ? 'colspan="3"' : ""}><button type="button" class="xh ${c.obavezno ? "req" : ""}" data-i="${i}" aria-label="${esc(c.naziv)}: što se dobiva"><span>${esc(c.naziv)}</span><span class="ic" aria-hidden="true">i</span></button></th>`).join("");
+  const tr = PRIMJER.map((r) => `<tr>${stupci.map((c) => jeMj(c) ? r.mj.map((v) => `<td>${v}</td>`).join("") : `<td>${esc(r[c.naziv] ?? "")}</td>`).join("")}</tr>`).join("");
   $("#xl").innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
   document.querySelectorAll(".xh").forEach((b) => { const i = +b.dataset.i; b.addEventListener("click", () => info(i)); b.addEventListener("mouseenter", () => info(i)); b.addEventListener("focus", () => info(i)); });
-  info(0);
+  info(stupci.findIndex(jeMj));
 }
 sprancaPregled();
 
