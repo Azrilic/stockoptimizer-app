@@ -50,7 +50,7 @@ class Parametri:
     trosak_narudzbe: float = 60.0   # S, EUR po narudžbi
     drzanje_postotak: float = 20.0  # h, % nabavne cijene godišnje (H = h * nabavna)
     lead_time_default: float = 21.0  # dani, kad izvoz nema lead time
-    cf_faktori: tuple = (30, 60, 85, 97)  # % otkupne vrijednosti zalihe: do 1 (uklj. bez prodaje) | 1 do 2 | 2 do praga | preko praga (procjena)
+    cf_faktori: tuple = (30, 70, 85, 97)  # % otkupne vrijednosti zalihe: do 1 (uklj. bez prodaje) | 1 do 2 | 2 do praga | preko praga (procjena)
     cf_prag: float | None = None  # gornji prag; None = zaokruženi medijan obrtaja, ali najmanje 3 i najviše 5
     pokrivenost_tjedana: float = 4.0  # količina po narudžbi kad nema nabavne cijene (EOQ nije moguć)
     abc_a: float = 80.0
@@ -419,15 +419,19 @@ def izracunaj(df: pd.DataFrame, p: Parametri, upozorenja: list[str] | None = Non
     saz["marza_ukupno"] = float(a["marza_god"].sum()) if ima_marzu else None
 
     pretp += [
-        f"Sigurnosna zaliha = z × σ potražnje × √LT (bez varijabilnosti roka isporuke); z po klasi: "
-        f"A {p.razina_a}% ({p.z_za('A')}), B {p.razina_b}% ({p.z_za('B')}), C {p.razina_c}% ({p.z_za('C')}).",
-        "Ova sigurnosna zaliha pretpostavlja da rok isporuke ne varira. To je donja granica.",
+        f"Sigurnosna zaliha = z × σ × vremenski faktor, gdje je vremenski faktor √(LT / horizont planiranja). σ je standardna devijacija "
+        f"potražnje po mjesecu (iz 12 mjeseci prodaje), pa je horizont planiranja {DANA_U_MJESECU:g} dana, a LT je rok isporuke u danima. "
+        f"Vremenski faktor preračunava mjesečnu varijabilnost potražnje na razdoblje roka isporuke: npr. za LT od 21 dan je "
+        f"√(21 / {DANA_U_MJESECU:g}) = {np.sqrt(21 / DANA_U_MJESECU):.2f}. Razina usluge z po klasi: "
+        f"A {p.razina_a}% (z = {p.z_za('A')}), B {p.razina_b}% (z = {p.z_za('B')}), C {p.razina_c}% (z = {p.z_za('C')}).",
+        "Ova sigurnosna zaliha pretpostavlja da rok isporuke ne varira (uzima se samo varijabilnost potražnje). To je donja granica.",
+        f"Točka ponovnog naručivanja = prosječna dnevna potražnja × LT + sigurnosna zaliha, uz dnevnu potražnju kao mjesečnu / {DANA_U_MJESECU:g}.",
         (f"EOQ = √(2 × godišnja potražnja × S / H), uz S = {p.trosak_narudzbe:g} € po narudžbi i "
          f"H = {p.drzanje_postotak:g}% nabavne cijene godišnje.") if ima_cijene else
         f"Količina po narudžbi = potražnja za {p.pokrivenost_tjedana:g} tjedna (EOQ zahtijeva nabavnu cijenu).",
         f"ABC po osnovi: {abc_osnova} (A do {p.abc_a:g}%, B do {p.abc_b:g}% kumulativno); "
         f"XYZ po koeficijentu varijacije (X ≤ {p.xyz_x:g}, Y ≤ {p.xyz_y:g}).",
-        f"Mjesec se računa kao {DANA_U_MJESECU:g} dana; σ potražnje je uzorkovana standardna devijacija 12 mjeseci.",
+        f"σ potražnje je uzorkovana standardna devijacija 12 mjesečnih prodaja, a mjesec se računa kao {DANA_U_MJESECU:g} dana.",
         "Narudžba: ako je zaliha na stanju plus na putu na ili ispod točke naručivanja, naručuje se višekratnik EOQ-a "
         "(zaokruženo na MOQ i pakiranje) dovoljan da pozicija prijeđe točku naručivanja.",
         *([f"Cash-flow potencijal (otkupna vrijednost zaliha): koliko bi zalihe stvarno vrijedile da ih danas želite pretvoriti u gotovinu. "

@@ -267,7 +267,7 @@ def test_gornji_prag_cashflowa_je_zaokruzeni_medijan_od_3_do_5():
 
 def test_zadani_faktori_su_konzervativni_i_padaju_s_obrtajem():
     f = Parametri().cf_faktori
-    assert f == (30, 60, 85, 97)
+    assert f == (30, 70, 85, 97)
     assert all(a <= b for a, b in zip(f, f[1:]))  # što sporiji obrtaj, to manji faktor
 
 
@@ -300,3 +300,11 @@ def test_opisi_stupaca_su_recenice_s_uvjetom():
     redak = _opisni_redak()
     assert len(redak) == len(STUPCI_PREDLOSKA) and redak[0].startswith("# ")
     assert not any(";" in c for c in redak)                  # ne smije razbiti CSV
+
+
+def test_objasnjenje_sigurnosne_zalihe_navodi_vremenski_faktor():
+    d, _ = priprema(minimalni([[10, 12, 9, 11, 14, 10, 8, 12, 13, 9, 11, 10]]))
+    tekst = " ".join(izracunaj(d, Parametri()).pretpostavke)
+    assert "vremenski faktor" in tekst and "horizont planiranja" in tekst
+    assert "√(21 / 30) = 0.84" in tekst
+    assert "Točka ponovnog naručivanja" in tekst

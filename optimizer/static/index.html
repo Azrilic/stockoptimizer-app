@@ -492,7 +492,7 @@ function cashflowKartica(d) {
 
 /* ---------- špranca s oblačićima + faktori realizacije ---------- */
 const CF_POJASI = ["do 1 (uklj. bez prodaje)", "1 do 2", "2 do praga", "preko praga"];
-const CF_ZADANO = [30, 60, 85, 97];
+const CF_ZADANO = [30, 70, 85, 97];
 $("#cfInputs").innerHTML = CF_POJASI.map((l, i) => `<label>Obrtaj ${l}: otkupna vrijednost (%)<input type="number" name="cf_${i}" value="${CF_ZADANO[i]}" min="0" max="100" step="1"></label>`).join("")
   + `<label>Gornji prag obrtaja<input type="number" name="cf_prag" placeholder="automatski" min="2" max="20" step="1"><small>Prazno = zaokruženi medijan obrtaja vaših artikala, najmanje 3 i najviše 5.</small></label>`;
 

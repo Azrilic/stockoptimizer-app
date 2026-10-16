@@ -15,7 +15,7 @@ Gumb "Isprobaj s primjerom" pokreće analizu na izmišljenim podacima, bez učit
 |---|---|
 | ABC | kumulativni godišnji promet (količina × prodajna cijena): A do 80 %, B do 95 %, C ostalo |
 | XYZ | koeficijent varijacije 12 mjeseci: X ≤ 0,5, Y ≤ 1,0, Z iznad |
-| Sigurnosna zaliha | `z × σD × √(LT/30)` – bez varijabilnosti roka isporuke (donja granica) |
+| Sigurnosna zaliha | `z × σD × √(LT / horizont)`, horizont = 30 dana (σD je mjesečna): vremenski faktor je `√(LT/30)`; bez varijabilnosti roka isporuke (donja granica) |
 | Točka naručivanja | `D/dan × LT + sigurnosna zaliha` |
 | EOQ | `√(2 · D · S / H)`, `H = h × nabavna cijena`; zaokruženo na MOQ i pakiranje |
 | Narudžba | ako je (stanje + na putu) ≤ točka naručivanja: višekratnik EOQ-a koji dovodi poziciju iznad točke |
@@ -34,7 +34,7 @@ Zadano: razine usluge A 98 % / B 95 % / C 90 %, S = 60 € po narudžbi, h = 20 
   gotovinu. Uvijek četiri kategorije prema koeficijentu obrtaja artikla: **do 1** (uključuje zalihu bez ikakve prodaje), **1 do 2**,
   **2 do X** i **preko X**. Gornji prag X je zaokruženi medijan obrtaja artikala koji se prodaju, ali najmanje 3 i najviše 5
   (može se zadati ručno), pa su kategorije uvijek cijeli brojevi i prilagođene firmi. Vrijednost zalihe (po nabavnoj cijeni) množi se
-  postotkom kategorije. Zadani postoci su 30 / 60 / 85 / 97 % i **samo su procjena**; mijenjaju se u Pretpostavkama
+  postotkom kategorije. Zadani postoci su 30 / 70 / 85 / 97 % i **samo su procjena**; mijenjaju se u Pretpostavkama
   (u kodu: `Parametri.cf_faktori`, `Parametri.cf_prag`). U sučelju je prvo rezultat (zaokružen) i rečenica o glavnom nalazu,
   a tablica je u rasklopljenom odjeljku "Kako smo to izračunali".
 
