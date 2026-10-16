@@ -50,7 +50,7 @@ class Parametri:
     trosak_narudzbe: float = 60.0   # S, EUR po narudžbi
     drzanje_postotak: float = 20.0  # h, % nabavne cijene godišnje (H = h * nabavna)
     lead_time_default: float = 21.0  # dani, kad izvoz nema lead time
-    cf_faktori: tuple = (25, 40, 60, 75, 85, 95, 100)  # % realne vrijednosti zalihe po pojasu obrtaja (procjena)
+    cf_faktori: tuple = (30, 40, 60, 80, 85, 90, 97)  # % otkupne vrijednosti zalihe po pojasu obrtaja (procjena)
     pokrivenost_tjedana: float = 4.0  # količina po narudžbi kad nema nabavne cijene (EOQ nije moguć)
     abc_a: float = 80.0
     abc_b: float = 95.0
@@ -414,7 +414,7 @@ def izracunaj(df: pd.DataFrame, p: Parametri, upozorenja: list[str] | None = Non
         f"Mjesec se računa kao {DANA_U_MJESECU:g} dana; σ potražnje je uzorkovana standardna devijacija 12 mjeseci.",
         "Narudžba: ako je zaliha na stanju plus na putu na ili ispod točke naručivanja, naručuje se višekratnik EOQ-a "
         "(zaokruženo na MOQ i pakiranje) dovoljan da pozicija prijeđe točku naručivanja.",
-        *([f"Cash-flow potencijal: vrijednost zalihe po nabavnoj cijeni umanjena faktorom realizacije prema koeficijentu obrtaja "
+        *([f"Cash-flow potencijal (otkupna vrijednost zaliha): koliko bi zalihe stvarno vrijedile da ih danas želite pretvoriti u gotovinu. To je vrijednost zalihe po nabavnoj cijeni umanjena faktorom realizacije prema koeficijentu obrtaja "
            f"({', '.join(f'{l}: {f:g}%' for l, f in zip(CF_POJASI, p.cf_faktori))}). Faktori su procjena i mijenjaju se u pretpostavkama."]
           if ima_cf else []),
         *(["GMROI = godišnja bruto marža / prosječna zaliha po nabavnoj cijeni: koliko eura bruto marže godišnje donosi euro uložen u zalihe."]
@@ -570,7 +570,7 @@ def izvezi_excel(rez: Rezultat, p: Parametri) -> bytes:
         "sigurnosna": "Sigurnosna zaliha", "tocka_naruc": "Točka naručivanja", "eoq": "Količina po narudžbi", "eoq_izvor": "Način izračuna količine",
         "narudzbi_god": "Narudžbi god.", "trenutna": "Trenutna zaliha", "na_putu": "Na putu", "narudzba": "Za naručiti", "zaliha": "Prosječna zaliha", "obrtaj": "Obrtaj",
         "dani_zalihe": "Dani zalihe", "vrijednost_zalihe": "Vrijednost zalihe (€)", "marza_pct": "Marža %", "gmroi": "GMROI",
-        "abc_marza": "ABC po marži", "cf_realna": "Realna vrijednost (€)", "status": "Status",
+        "abc_marza": "ABC po marži", "cf_realna": "Otkupna vrijednost (€)", "status": "Status",
     }
     stupci = {k: v for k, v in stupci.items() if k in a}
     matrica = a[list(stupci)].rename(columns=stupci).copy()
@@ -596,7 +596,7 @@ def izvezi_excel(rez: Rezultat, p: Parametri) -> bytes:
         if cf:
             tab = pd.DataFrame(cf["redovi"]).rename(columns={
                 "pojas": "Koeficijent obrtaja", "artikala": "Artikala", "vrijednost": "Vrijednost zalihe (€)",
-                "udio": "Udio (%)", "faktor": "Faktor realizacije (%)", "realna": "Realna vrijednost (€)", "umanjenje": "Umanjenje (€)"}).round(2)
+                "udio": "Udio (%)", "faktor": "Faktor realizacije (%)", "realna": "Otkupna vrijednost (€)", "umanjenje": "Umanjenje (€)"}).round(2)
             tab.loc[len(tab)] = ["Ukupno", int(tab["Artikala"].sum()), round(cf["vrijednost"], 2), 100.0, None,
                                  round(cf["realna"], 2), round(cf["umanjenje"], 2)]
             tab.to_excel(w, sheet_name="Cash-flow potencijal", index=False)
@@ -643,18 +643,18 @@ def demo_podaci(n: int = 40, seed: int = 7) -> pd.DataFrame:
 # Jedan izvor opisa stupaca: koristi se u špranci (komentar na zaglavlju i opisni redak) i u sučelju.
 # (naziv, obavezno, što se dobiva kad se stupac popuni)
 OPISI_STUPACA = [
-    ("Šifra", True, "Jedinstvena oznaka artikla, jedan redak po artiklu. Bez nje nema analize."),
-    ("Naziv", False, "Samo za čitljivost popisa artikala i narudžbe."),
-    ("Dobavljač", False, "Narudžba razdvojena po dobavljaču i filtriranje cijele analize po dobavljaču."),
-    ("Nabavna cijena", False, "Vrijednosti u eurima, pravi EOQ (optimalna količina narudžbe), obrtaj po vrijednosti i cash-flow potencijal zaliha."),
-    ("Prodajna cijena", False, "Uz nabavnu cijenu: marža po artiklu, ABC analiza po marži i GMROI, tj. koliko eura bruto marže godišnje donosi euro uložen u zalihe."),
-    ("Prosječna zaliha", False, "Matrica zaliha naspram prodaje, koeficijent obrtaja, dani zalihe, status artikla, cash-flow potencijal i GMROI."),
-    ("Trenutna zaliha", False, "Količina koju treba naručiti ovaj tjedan."),
-    ("Na putu", False, "Da se već naručena roba ne naruči dvaput."),
-    ("Lead time", False, "Stvarni rok isporuke u danima umjesto zadanih 21: točnija sigurnosna zaliha i točka naručivanja."),
-    ("MOQ", False, "Narudžba ne pada ispod minimalne količine dobavljača."),
-    ("Pakiranje", False, "Narudžba se zaokružuje na cijelo pakiranje."),
-    ("Mjesec 1 do 12", True, "Količine prodaje po mjesecima, zadnjih 12 mjeseci (Mjesec 1 je najstariji). Daju ABC/XYZ analizu, sigurnosnu zalihu, točku naručivanja i količinu po narudžbi."),
+    ("Šifra", True, "Svaki artikl mora imati jedinstvenu šifru, jedan redak po artiklu. Bez šifre aplikacija ne može razlikovati artikle."),
+    ("Naziv", False, "Ako upišete naziv artikla, popis artikala i narudžba bit će čitljiviji. Za sam izračun naziv nije potreban."),
+    ("Dobavljač", False, "Ako upišete dobavljača, narudžbe se razdvajaju po dobavljaču, pa za svakog dobavljača dobijete zasebnu narudžbu. Cijelu analizu možete i filtrirati po dobavljaču."),
+    ("Nabavna cijena", False, "Ako upišete nabavnu cijenu, aplikacija izražava zalihe i narudžbe u eurima (vrijednost zaliha, vrijednost narudžbe) i računa optimalnu količinu narudžbe prema EOQ metodi, a to je količina uz koju je ukupni trošak naručivanja i držanja zaliha najmanji. Uz prosječnu zalihu dobivate i cash-flow potencijal zaliha."),
+    ("Prodajna cijena", False, "Ako uz nabavnu cijenu upišete i prodajnu, aplikacija računa maržu svakog artikla i omogućuje ABC analizu po marži, što je posebno korisno trgovačkim tvrtkama. Uz prosječnu zalihu računa i GMROI, tj. koliko eura bruto marže godišnje donosi svaki euro uložen u zalihe."),
+    ("Prosječna zaliha", False, "Ako upišete prosječnu zalihu u zadnjih 12 mjeseci (u komadima), aplikacija računa koeficijent obrtaja i dane zalihe, prikazuje matricu zaliha uz usporedbu s prodajom i status svakog artikla. Ako imate samo zalihu u nekoliko točaka godine, upišite njihov prosjek."),
+    ("Trenutna zaliha", False, "Ako upišete trenutnu zalihu (stanje u skladištu danas), aplikacija računa koliko treba naručiti ovaj tjedan. Bez nje dobijete samo sigurnosnu zalihu, točku naručivanja i količinu po jednoj narudžbi."),
+    ("Na putu", False, "Ako upišete količine koje su već naručene, a još nisu stigle, aplikacija ih uzima u obzir i ne naručuje istu robu dvaput."),
+    ("Lead time", False, "Ako upišete stvarni rok isporuke u danima, sigurnosna zaliha i točka naručivanja računaju se prema stvarnim rokovima. Bez toga koristi se zadanih 21 dan."),
+    ("MOQ", False, "Ako upišete minimalnu količinu koju dobavljač isporučuje, aplikacija neće predložiti narudžbu ispod te količine."),
+    ("Pakiranje", False, "Ako upišete veličinu pakiranja, količine za narudžbu zaokružuju se na cijela pakiranja."),
+    ("Mjesec 1 do 12", True, "Upišite koliko ste komada prodali u svakom od zadnjih 12 mjeseci (Mjesec 1 je najstariji). Iz toga aplikacija računa ABC/XYZ analizu, sigurnosnu zalihu, točku ponovnog naručivanja i količinu po jednoj narudžbi."),
 ]
 STUPCI_PREDLOSKA = [n for n, _, _ in OPISI_STUPACA[:-1]] + [f"Mjesec {i}" for i in range(1, 13)]
 _OBAVEZNI_PREDLOSKA = {"Šifra"} | {f"Mjesec {i}" for i in range(1, 13)}
@@ -668,12 +668,11 @@ def _opis_stupca(naziv: str) -> tuple[bool, str]:
 
 
 def _opisni_redak() -> list[str]:
-    """Drugi redak špranci: kratak opis što se dobiva uz svaki stupac. Šifra počinje s '#', pa ga učitavanje preskače."""
+    """Drugi redak špranci: što se dobiva uz svaki stupac. Šifra počinje s '#', pa ga učitavanje preskače."""
     redak = []
     for naziv in STUPCI_PREDLOSKA:
         obav, tekst = _opis_stupca(naziv)
-        kratko = tekst.split(". ")[0].rstrip(".").replace(";", ",")
-        redak.append(("OBAVEZNO. " if obav else "Neobavezno. ") + kratko)
+        redak.append(("Obavezno. " if obav else "Neobavezno. ") + tekst.replace(";", ","))
     redak[0] = "# " + redak[0]
     return redak
 
@@ -711,14 +710,14 @@ def predlozak_excel(s_primjerom: bool = False) -> bytes:
             c.fill = PatternFill("solid", fgColor="FF8A3D" if obav else "D9D9D9")
             c.font = Font(bold=True, color="000000")
             c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            c.comment = Comment(("OBAVEZNO. " if obav else "Neobavezno. ") + tekst, "StockOptimizer", width=340, height=120)
+            c.comment = Comment(("Obavezno. " if obav else "Neobavezno. ") + tekst, "StockOptimizer", width=360, height=150)
             d = ws.cell(row=2, column=i)
-            d.font = Font(italic=True, color="666666", size=9)
+            d.font = Font(italic=True, color="555555", size=9)
             d.alignment = Alignment(wrap_text=True, vertical="top")
             d.fill = PatternFill("solid", fgColor="F2F2F2")
-            ws.column_dimensions[c.column_letter].width = 16 if i > 11 else 24
+            ws.column_dimensions[c.column_letter].width = 16 if i > 11 else 34
         ws.row_dimensions[1].height = 32
-        ws.row_dimensions[2].height = 96
+        ws.row_dimensions[2].height = 150
         ws.freeze_panes = "B3"
         wu = w.book["Upute"]
         wu.column_dimensions["A"].width = 30

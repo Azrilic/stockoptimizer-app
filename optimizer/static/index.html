@@ -153,7 +153,7 @@ footer{color:#6c6c75;font-size:.78rem;margin-top:40px}
         <label>Pokrivenost bez nabavne cijene (tjedni)<input type="number" name="pokrivenost_tjedana" value="4" min="1" step="1"><small>Količina po narudžbi kad nema nabavne cijene.</small></label>
         <label>Zadani lead time (dani)<input type="number" name="lead_time_default" value="21" min="1" step="1"><small>Za artikle bez lead timea u izvozu.</small></label>
       </div>
-      <p class="note" style="margin:14px 0 0">Cash-flow potencijal: koliki se dio vrijednosti zalihe realno može pretvoriti u novac, prema koeficijentu obrtaja artikla. To su zadane procjene, prilagodite ih svojoj branši.</p>
+      <p class="note" style="margin:14px 0 0">Cash-flow potencijal (otkupna vrijednost zaliha): koliko bi zalihe vrijedile da ih danas pretvarate u gotovinu, ovisno o tome koliko se brzo artikl vrti. Što sporiji obrtaj, to manji postotak. To su zadane procjene, prilagodite ih svojoj branši.</p>
       <div class="grid" id="cfInputs"></div>
     </details>
     <div class="row" style="margin-top:16px">
@@ -304,7 +304,7 @@ function start(d) {
       ${s.vrijednost_zaliha != null ? `<div class="stat"><b>${eur(s.vrijednost_zaliha)}</b><span>vrijednost zaliha</span></div>` : ""}
       ${s.vrijednost_visak != null ? `<div class="stat"><b>${eur(s.vrijednost_visak)}</b><span>zalihe u višku ili bez prodaje</span></div>` : ""}
       ${s.gmroi != null ? `<div class="stat"><b>${fmt(s.gmroi, 2)}</b><span>GMROI: eura bruto marže godišnje na euro uložen u zalihe</span></div>` : ""}
-      ${s.cashflow ? `<div class="stat"><b>${eur(s.cashflow.realna)}</b><span>cash-flow potencijal (realna vrijednost zaliha)</span></div>` : ""}
+      ${s.cashflow ? `<div class="stat"><b>${eur(s.cashflow.realna)}</b><span>cash-flow potencijal: otkupna vrijednost zaliha</span></div>` : ""}
     </div>
     <p style="margin:14px 0 0">${s.recenice.map(esc).join(" ")}</p>
     <p class="note" style="margin:6px 0 0">ABC osnova: ${esc(s.abc_osnova)}.</p>`;
@@ -393,7 +393,7 @@ const STUPCI = [
   {k: "potraznja_god", t: "Prodaja god.", n: 1}, {k: "promet", t: "Promet", n: 1, d: 0},
   {k: "zaliha", t: "Prosj. zaliha", n: 1}, {k: "vrijednost_zalihe", t: "Vrijed. zalihe €", n: 1},
   {k: "obrtaj", t: "Obrtaj", n: 1, d: 1}, {k: "dani_zalihe", t: "Dani zalihe", n: 1},
-  {k: "marza_pct", t: "Marža %", n: 1, d: 1}, {k: "gmroi", t: "GMROI", n: 1, d: 2}, {k: "cf_realna", t: "Realna vrijed. €", n: 1, d: 0},
+  {k: "marza_pct", t: "Marža %", n: 1, d: 1}, {k: "gmroi", t: "GMROI", n: 1, d: 2}, {k: "cf_realna", t: "Otkupna vrijed. €", n: 1, d: 0},
   {k: "sigurnosna", t: "Sig. zaliha", n: 1, c: 1}, {k: "tocka_naruc", t: "Točka nar.", n: 1, c: 1},
   {k: "eoq", t: "Kol. po narudžbi", n: 1}, {k: "trenutna", t: "Trenutna", n: 1}, {k: "narudzba", t: "Za naručiti", n: 1, b: 1}, {k: "status", t: "Status"},
 ];
@@ -453,26 +453,27 @@ function cashflowKartica(d) {
   const cf = d.sazetak.cashflow;
   const el = $("#cfCard");
   if (!cf) {
-    el.innerHTML = `<h2>Cash-flow potencijal zaliha</h2><p class="note" style="margin:0">Za ovaj izračun treba <b>nabavna cijena</b> i <b>prosječna zaliha</b> (ili trenutna zaliha). Što se zaliha sporije vrti, to je manje vjerojatno da će se prodati po punoj vrijednosti.</p>`;
+    el.innerHTML = `<h2>Cash-flow potencijal zaliha</h2><p class="note" style="margin:0">Ovo pokazuje koliko bi zalihe stvarno vrijedile kad biste ih danas željeli pretvoriti u gotovinu. Ako u izvoz dodate <b>nabavnu cijenu</b> i <b>prosječnu zalihu</b> (ili trenutnu zalihu), aplikacija to izračunava.</p>`;
     return;
   }
   const red = (r) => `<tr><td>${esc(r.pojas)}</td><td class="n">${fmt(r.artikala)}</td><td class="n">${eur(r.vrijednost)}</td><td class="n">${fmt(r.udio, 1)}%</td><td class="n">${fmt(r.faktor, 0)}%</td><td class="n"><b>${eur(r.realna)}</b></td><td class="n">${eur(r.umanjenje)}</td></tr>`;
   const uk = cf.redovi.reduce((t, r) => t + r.artikala, 0);
   el.innerHTML = `<h2>Cash-flow potencijal zaliha</h2>
-    <p class="note" style="margin:0 0 12px">Što se artikl sporije vrti, to je manje vjerojatno da će se cijela zaliha prodati po punoj vrijednosti. Vrijednost zalihe (po nabavnoj cijeni) umanjena je faktorom realizacije prema koeficijentu obrtaja. Faktori su procjena i mijenjaju se u Pretpostavkama.</p>
+    <p style="margin:0 0 6px"><b>Otkupna vrijednost zaliha:</b> koliko bi zalihe stvarno vrijedile kad biste ih danas željeli pretvoriti u gotovinu.</p>
+    <p class="note" style="margin:0 0 14px">Što se artikl sporije vrti, to je manje vjerojatno da će se cijela zaliha prodati po punoj vrijednosti. Zato se vrijednost zalihe (po nabavnoj cijeni) množi postotkom koji ovisi o koeficijentu obrtaja: brzi artikli zadržavaju gotovo cijelu vrijednost, spori i mrtva zaliha samo manji dio. Postoci su procjena i mijenjaju se u Pretpostavkama.</p>
     <div class="hero" style="margin-bottom:14px">
-      <div class="stat"><b>${eur(cf.vrijednost)}</b><span>vrijednost zaliha</span></div>
-      <div class="stat"><b>${eur(cf.realna)}</b><span>cash-flow potencijal (realna vrijednost)</span></div>
+      <div class="stat"><b>${eur(cf.vrijednost)}</b><span>vrijednost zaliha po nabavnoj cijeni</span></div>
+      <div class="stat"><b>${eur(cf.realna)}</b><span>otkupna vrijednost zaliha (cash-flow potencijal)</span></div>
       <div class="stat"><b>${eur(cf.umanjenje)}</b><span>umanjenje zbog sporog obrtaja</span></div>
     </div>
-    <div class="scroll"><table><thead><tr><th>Koeficijent obrtaja</th><th class="n">Artikala</th><th class="n">Vrijednost zalihe</th><th class="n">Udio</th><th class="n">Faktor realizacije</th><th class="n">Realna vrijednost</th><th class="n">Umanjenje</th></tr></thead>
+    <div class="scroll"><table><thead><tr><th>Koeficijent obrtaja</th><th class="n">Artikala</th><th class="n">Vrijednost zalihe</th><th class="n">Udio</th><th class="n">Postotak otkupne vrijednosti</th><th class="n">Otkupna vrijednost</th><th class="n">Umanjenje</th></tr></thead>
     <tbody>${cf.redovi.map(red).join("")}<tr><td><b>Ukupno</b></td><td class="n"><b>${fmt(uk)}</b></td><td class="n"><b>${eur(cf.vrijednost)}</b></td><td class="n"><b>100%</b></td><td class="n">${cf.vrijednost ? fmt(cf.realna / cf.vrijednost * 100, 0) + "%" : "–"}</td><td class="n"><b>${eur(cf.realna)}</b></td><td class="n"><b>${eur(cf.umanjenje)}</b></td></tr></tbody></table></div>`;
 }
 
 /* ---------- špranca s oblačićima + faktori realizacije ---------- */
 const CF_POJASI = ["Bez prodaje", "do 1", "1 do 2", "2 do 3", "3 do 4", "4 do 6", "preko 6"];
-const CF_ZADANO = [25, 40, 60, 75, 85, 95, 100];
-$("#cfInputs").innerHTML = CF_POJASI.map((l, i) => `<label>Obrtaj ${l} (%)<input type="number" name="cf_${i}" value="${CF_ZADANO[i]}" min="0" max="100" step="1"></label>`).join("");
+const CF_ZADANO = [30, 40, 60, 80, 85, 90, 97];
+$("#cfInputs").innerHTML = CF_POJASI.map((l, i) => `<label>Obrtaj ${l}: otkupna vrijednost (%)<input type="number" name="cf_${i}" value="${CF_ZADANO[i]}" min="0" max="100" step="1"></label>`).join("");
 
 const PRIMJER = [["ART-001", "Vijak M6", "Alfa d.o.o.", "0,12", "0,20", "3.100", "1.500", "0", "14", "1.000", "500"],
                  ["ART-002", "Matica M6", "Alfa d.o.o.", "0,05", "0,09", "2.400", "900", "2.000", "14", "2.000", "1.000"],

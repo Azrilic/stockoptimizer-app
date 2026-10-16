@@ -233,7 +233,7 @@ def test_bez_cijena_nema_marze_ni_gmroi():
 
 
 def test_cashflow_pojasi_i_faktori():
-    # obrtaj = potražnja / zaliha: 0,5 -> 'do 1' (40 %), 3 -> '2 do 3' (75 %), bez prodaje -> 'Bez prodaje' (25 %)
+    # obrtaj = potražnja / zaliha: 0,5 -> 'do 1' (40 %), 3 -> '2 do 3' (80 %), bez prodaje -> 'Bez prodaje' (30 %)
     d, _ = priprema(_puni([([5] * 12, 10.0, 15.0, 120),    # D=60, zaliha 120  -> obrtaj 0,5
                            ([30] * 12, 10.0, 15.0, 120),   # D=360, zaliha 120 -> obrtaj 3
                            ([0] * 12, 10.0, 15.0, 50)]))   # bez prodaje, zaliha 50
@@ -241,16 +241,22 @@ def test_cashflow_pojasi_i_faktori():
     a = r.artikli
     assert list(a["cf_pojas"]) == [1, 3, 0]
     assert a.loc[0, "cf_realna"] == pytest.approx(1200 * 0.40)
-    assert a.loc[1, "cf_realna"] == pytest.approx(1200 * 0.75)
-    assert a.loc[2, "cf_realna"] == pytest.approx(500 * 0.25)
+    assert a.loc[1, "cf_realna"] == pytest.approx(1200 * 0.80)
+    assert a.loc[2, "cf_realna"] == pytest.approx(500 * 0.30)
     cf = r.sazetak["cashflow"]
     assert cf["vrijednost"] == pytest.approx(1200 + 1200 + 500)
-    assert cf["realna"] == pytest.approx(480 + 900 + 125)
+    assert cf["realna"] == pytest.approx(480 + 960 + 150)
     assert cf["umanjenje"] == pytest.approx(cf["vrijednost"] - cf["realna"])
     assert sum(x["artikala"] for x in cf["redovi"]) == 3
     # vlastiti faktori
     r2 = izracunaj(d, Parametri(cf_faktori=(0, 50, 50, 50, 50, 50, 50)))
     assert r2.sazetak["cashflow"]["realna"] == pytest.approx(0.5 * 2400)
+
+
+def test_zadani_faktori_su_konzervativni_i_padaju_s_obrtajem():
+    f = Parametri().cf_faktori
+    assert f == (30, 40, 60, 80, 85, 90, 97)
+    assert all(a <= b for a, b in zip(f, f[1:]))  # što sporiji obrtaj, to manji faktor
 
 
 def test_spranca_ima_opisni_redak_koji_se_preskace():
@@ -271,3 +277,14 @@ def test_decimalni_zarez_uz_opisni_redak():
     csv = "\n".join(zaglavlje + [redak]).encode("utf-8")
     d, _ = priprema(ucitaj(csv, "x.csv"))
     assert d["nabavna"].tolist() == [1.5] and d["prodajna"].tolist() == [2.25]
+
+
+def test_opisi_stupaca_su_recenice_s_uvjetom():
+    from engine import OPISI_STUPACA, _opisni_redak, STUPCI_PREDLOSKA
+    for naziv, obavezno, tekst in OPISI_STUPACA:
+        assert tekst.endswith("."), naziv
+        if not obavezno and naziv != "Pakiranje":
+            assert tekst.startswith("Ako "), naziv          # npr. "Ako upišete nabavnu cijenu, ..."
+    redak = _opisni_redak()
+    assert len(redak) == len(STUPCI_PREDLOSKA) and redak[0].startswith("# ")
+    assert not any(";" in c for c in redak)                  # ne smije razbiti CSV
