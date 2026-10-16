@@ -31,7 +31,7 @@ def main(argv=None) -> int:
         print(f"U mapi {ulaz} nema .csv ni .xlsx datoteke.", file=sys.stderr)
         return 2
     datoteka = max(kandidati, key=lambda f: f.stat().st_mtime)
-    p = Parametri(**{k: getattr(a, k) for k in vars(d)})
+    p = Parametri(**{k: getattr(a, k) for k in vars(d) if hasattr(a, k)})
     try:
         df = engine.ucitaj(datoteka.read_bytes(), datoteka.name)
         pod, upoz = engine.priprema(df)

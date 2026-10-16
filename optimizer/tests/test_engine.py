@@ -200,3 +200,74 @@ def test_prazna_spranca_je_jasna_greska():
     from engine import ucitaj, predlozak_csv
     with pytest.raises(GreskaUnosa, match="nijednog retka"):
         priprema(ucitaj(predlozak_csv(), "p.csv"))
+
+
+def _puni(redovi):
+    """redovi: (mjeseci, nabavna, prodajna, prosj. zaliha)"""
+    return okvir([(f"a{i}", m, n, pr, z) for i, (m, n, pr, z) in enumerate(redovi)])
+
+
+def test_marza_gmroi_i_abc_po_marzi():
+    # artikl 0: velik promet, mala marža; artikl 1: manji promet, velika marža
+    d, _ = priprema(_puni([([300] * 12, 10.0, 10.5, 300),      # promet 37.800, marža 1.800
+                           ([10] * 12, 10.0, 40.0, 10),        # promet 4.800, marža 3.600
+                           ([1] * 12, 10.0, 11.0, 5)]))        # promet 132, marža 12
+    r = izracunaj(d, Parametri())
+    a = r.artikli
+    assert a.loc[0, "marza_god"] == pytest.approx(1800)
+    assert a.loc[1, "marza_pct"] == pytest.approx(75)
+    assert a.loc[0, "gmroi"] == pytest.approx(1800 / (300 * 10))       # 0,6
+    assert a.loc[1, "gmroi"] == pytest.approx(3600 / (10 * 10))        # 36
+    assert a.loc[0, "abc"] == "A" and a.loc[1, "abc"] == "B"           # po prometu vodi artikl 0
+    assert a.loc[1, "abc_marza"] == "A"                                 # po marži vodi artikl 1
+    assert r.sazetak["ima_marzu"] is True
+    assert r.sazetak["gmroi"] == pytest.approx((1800 + 3600 + 12) / (3000 + 100 + 50))
+
+
+def test_bez_cijena_nema_marze_ni_gmroi():
+    d, _ = priprema(minimalni([[10] * 12]))
+    r = izracunaj(d, Parametri())
+    assert r.sazetak["ima_marzu"] is False and r.sazetak["gmroi"] is None
+    assert r.artikli["abc_marza"].isna().all()
+    assert r.sazetak["cashflow"] is None
+
+
+def test_cashflow_pojasi_i_faktori():
+    # obrtaj = potražnja / zaliha: 0,5 -> 'do 1' (40 %), 3 -> '2 do 3' (75 %), bez prodaje -> 'Bez prodaje' (25 %)
+    d, _ = priprema(_puni([([5] * 12, 10.0, 15.0, 120),    # D=60, zaliha 120  -> obrtaj 0,5
+                           ([30] * 12, 10.0, 15.0, 120),   # D=360, zaliha 120 -> obrtaj 3
+                           ([0] * 12, 10.0, 15.0, 50)]))   # bez prodaje, zaliha 50
+    r = izracunaj(d, Parametri())
+    a = r.artikli
+    assert list(a["cf_pojas"]) == [1, 3, 0]
+    assert a.loc[0, "cf_realna"] == pytest.approx(1200 * 0.40)
+    assert a.loc[1, "cf_realna"] == pytest.approx(1200 * 0.75)
+    assert a.loc[2, "cf_realna"] == pytest.approx(500 * 0.25)
+    cf = r.sazetak["cashflow"]
+    assert cf["vrijednost"] == pytest.approx(1200 + 1200 + 500)
+    assert cf["realna"] == pytest.approx(480 + 900 + 125)
+    assert cf["umanjenje"] == pytest.approx(cf["vrijednost"] - cf["realna"])
+    assert sum(x["artikala"] for x in cf["redovi"]) == 3
+    # vlastiti faktori
+    r2 = izracunaj(d, Parametri(cf_faktori=(0, 50, 50, 50, 50, 50, 50)))
+    assert r2.sazetak["cashflow"]["realna"] == pytest.approx(0.5 * 2400)
+
+
+def test_spranca_ima_opisni_redak_koji_se_preskace():
+    from engine import ucitaj, predlozak_csv, predlozak_excel
+    redak = ";".join(["A1"] + [""] * 10 + [str(10 + i) for i in range(12)]) + "\n"
+    d, _ = priprema(ucitaj(predlozak_csv() + redak.encode("utf-8"), "x.csv"))
+    assert d["sifra"].tolist() == ["A1"]                       # opisni redak nije postao artikl
+    with pytest.raises(GreskaUnosa, match="nijednog retka"):
+        priprema(ucitaj(predlozak_excel(), "p.xlsx"))          # prazna špranca: samo opisi
+    d, _ = priprema(ucitaj(predlozak_excel(s_primjerom=True), "primjer.xlsx"))
+    assert len(d) == 40
+
+
+def test_decimalni_zarez_uz_opisni_redak():
+    from engine import ucitaj, predlozak_csv
+    zaglavlje = predlozak_csv().decode("utf-8").split("\n")[:2]
+    redak = ";".join(["A1", "Naziv", "Dob", "1,5", "2,25", "10", "", "", "", "", ""] + ["5"] * 12)
+    csv = "\n".join(zaglavlje + [redak]).encode("utf-8")
+    d, _ = priprema(ucitaj(csv, "x.csv"))
+    assert d["nabavna"].tolist() == [1.5] and d["prodajna"].tolist() == [2.25]

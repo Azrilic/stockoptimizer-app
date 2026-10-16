@@ -24,6 +24,22 @@ Gumb "Isprobaj s primjerom" pokreće analizu na izmišljenim podacima, bez učit
 
 Zadano: razine usluge A 98 % / B 95 % / C 90 %, S = 60 € po narudžbi, h = 20 % godišnje, lead time 21 dan kad ga izvoz nema.
 
+## Dodatni pokazatelji
+
+- **ABC po prometu, marži ili količini:** prebacuje se u sučelju. Marža = prodajna − nabavna cijena (treba obje cijene), a artikli koji se
+  prodaju ispod nabavne cijene idu u C.
+- **GMROI** = godišnja bruto marža / prosječna zaliha po nabavnoj cijeni: koliko eura bruto marže godišnje donosi euro uložen u zalihe.
+  Prikazuje se po artiklu i za cijelu zalihu (treba obje cijene i prosječnu zalihu).
+- **Cash-flow potencijal zaliha:** vrijednost zalihe (po nabavnoj cijeni) razvrstana po koeficijentu obrtaja artikla u pojaseve
+  (bez prodaje, do 1, 1 do 2, 2 do 3, 3 do 4, 4 do 6, preko 6) i umanjena faktorom realizacije. Zadani faktori su
+  25 / 40 / 60 / 75 / 85 / 95 / 100 % i **samo su procjena**; mijenjaju se u Pretpostavkama (u kodu: `Parametri.cf_faktori`).
+
+## Špranca za unos
+
+Preuzima se s početne stranice (Excel i CSV). Drugi redak špranci opisuje što se dobiva uz svaki stupac. Počinje znakom `#`,
+pa ga učitavanje preskače. Isti se opisi prikazuju u sučelju kao interaktivni pregled stupaca (`/api/stupci`).
+Opisi su na jednom mjestu: `engine.OPISI_STUPACA`.
+
 ## Ulaz
 
 Excel ili CSV. **Obavezno je samo: šifra artikla i 12 uzastopnih stupaca s mjesečnom prodajom (količine).**

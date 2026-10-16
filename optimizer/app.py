@@ -30,6 +30,17 @@ def parametri_iz(src) -> Parametri:
                 setattr(p, k, tip(str(v).replace(",", ".")))
             except ValueError as e:
                 raise GreskaUnosa(f"Parametar '{k}' nije ispravan broj.") from e
+    faktori = list(p.cf_faktori)
+    for i in range(len(faktori)):
+        v = src.get(f"cf_{i}")
+        if v not in (None, ""):
+            try:
+                faktori[i] = float(str(v).replace(",", "."))
+            except ValueError as e:
+                raise GreskaUnosa("Faktori realizacije moraju biti brojevi.") from e
+    if any(not 0 <= f <= 100 for f in faktori):
+        raise GreskaUnosa("Faktori realizacije moraju biti između 0 i 100 %.")
+    p.cf_faktori = tuple(faktori)
     if p.trosak_narudzbe < 0 or p.drzanje_postotak <= 0 or p.lead_time_default <= 0 or p.pokrivenost_tjedana <= 0:
         raise GreskaUnosa("Trošak narudžbe ne smije biti negativan, a držanje, lead time i pokrivenost moraju biti veći od nule.")
     if not (0 < p.abc_a < p.abc_b <= 100):
@@ -84,7 +95,8 @@ def odgovor(rez):
     imamo_narudzbu = bool(a["narudzba"].notna().any())
     cols = ["sifra", "naziv", "dobavljac", "abc", "xyz", "klasa", "potraznja_god", "promet", "zaliha",
             "vrijednost_zalihe", "obrtaj", "dani_zalihe", "sigurnosna", "tocka_naruc", "eoq", "eoq_izvor",
-            "status", "lt_dani", "lt_izvor", "cv"]
+            "status", "lt_dani", "lt_izvor", "cv", "abc_marza", "abc_kolicina", "marza_pct", "marza_god", "gmroi",
+            "cf_faktor", "cf_realna"]
     if imamo_narudzbu:
         cols += [c for c in ("trenutna", "na_putu", "narudzba", "vrijednost_narudzbe") if c in a]
     return {
@@ -130,6 +142,11 @@ def izvoz_csv():
 
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@app.route("/api/stupci")
+def stupci():
+    return jsonify([{"naziv": n, "obavezno": o, "opis": t} for n, o, t in engine.OPISI_STUPACA])
 
 
 @app.route("/api/predlozak.xlsx")
